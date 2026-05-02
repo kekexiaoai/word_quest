@@ -1,26 +1,28 @@
-# Word Quest
+# Word Quest / 词途
 
-Word Quest 是一个给两个孩子使用的本地优先背单词应用。第一版采用“每日任务 + 闯关反馈”的产品形态，支持多孩子档案、基础题型、少量听音题、家长轻量看板和备份导入导出。
+Word Quest（词途）是一个本地优先的背单词应用，当前面向单个孩子日常学习和家长轻量看板。应用已经接入动态关卡、真实学习记录、错词复习、本地备份和 Android 试用包构建流程。
 
-## 当前阶段
+## 当前功能
 
-当前仓库处于项目骨架阶段：
-
-- 已记录产品设计文档。
-- 已记录第一阶段实施计划。
-- 正在搭建 Flutter 项目结构和核心学习模型。
+- 首页按当前孩子、当前词表、掌握比例和到期复习数动态规划今日题量。
+- 关卡支持新词热身、到期复习、错词 Boss 和宝箱结算。
+- 答题记录会写入本地仓库，并驱动错词、薄弱点和间隔复习。
+- CSV 导入词表可立即参与关卡出题。
+- 导入词表、学习记录、冒险和宠物进度支持本地持久化与备份迁移。
+- 设置页支持孩子 / 家长模式切换、默认学习词表选择和数据管理。
+- 家长模式首页展示孩子总览，并可进入单个孩子详情页查看趋势、错词、复习建议和词表完成情况。
+- 家长详情页的错词可直接进入该孩子专属错词复习题组。
 
 ## 技术路线
 
 - Flutter + Dart。
-- 第一阶段优先 Flutter Web / PWA。
-- 后续打包 Android、iOS、macOS、Windows。
+- Android 包名：`com.kekexiaoai.wordquest`。
 - 学习核心逻辑保持纯 Dart，便于测试和多端复用。
-- 数据访问通过 Repository 抽象预留云同步。
+- 数据访问通过 Repository 抽象组织，当前以本地优先为主。
 
 ## 本地运行
 
-当前机器尚未安装 Flutter SDK，因此本轮无法直接运行 Flutter 命令。安装 Flutter 后，在本目录执行：
+安装 Flutter SDK 并加入 PATH 后，在项目根目录执行：
 
 ```bash
 flutter pub get
@@ -28,13 +30,53 @@ flutter test
 flutter run -d chrome
 ```
 
-## 当前验证记录
+## 本地验证
 
-- `flutter --version`：未通过，当前环境提示 `command not found: flutter`。
-- `flutter test`：未通过，当前环境提示 `command not found: flutter`。
-- 安装 Flutter SDK 后，优先运行 `flutter pub get` 和 `flutter test`。
+提交前建议至少运行：
+
+```bash
+flutter analyze
+flutter test
+```
+
+当前已验证：
+
+- `flutter analyze`：无问题。
+- `flutter test`：72 个测试通过。
+
+## Android APK 打包
+
+仓库已配置 GitHub Actions：`.github/workflows/android-apk.yml`。
+
+触发方式：
+
+- push 到 `main` 分支自动构建。
+- 在 GitHub 仓库的 Actions 页面手动运行 `Android APK` workflow。
+
+构建流程会执行：
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+构建完成后，在 GitHub Actions 的运行详情页下载 artifact：
+
+```text
+word-quest-debug-apk
+```
+
+里面的 APK 路径是：
+
+```text
+app-debug.apk
+```
+
+手机试用时，安卓设备需要允许安装未知来源应用。当前 workflow 先产出 debug APK，适合内部快速试用；后续发布前再补 release 签名包。
 
 ## 文档
 
 - 产品设计：`docs/superpowers/specs/2026-05-02-word-quest-design.md`
-- 第一阶段计划：`docs/superpowers/plans/2026-05-02-word-quest-phase1.md`
+- 等级与宠物设计：`docs/superpowers/specs/2026-05-02-word-quest-level-and-pet-design.md`
