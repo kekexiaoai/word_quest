@@ -9,6 +9,8 @@ class AdventureLevelQuiz {
     required this.choices,
     required this.successTitle,
     required this.explanation,
+    this.failureTitle = '再试一次',
+    this.failureExplanation = '这题会放到本关稍后再试。',
     required this.usesAudioPrompt,
   });
 
@@ -21,5 +23,7 @@ class AdventureLevelQuiz {
   final List<String> choices;
   final String successTitle;
   final String explanation;
+  final String failureTitle;
+  final String failureExplanation;
   final bool usesAudioPrompt;
 }

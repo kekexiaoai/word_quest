@@ -1423,19 +1423,23 @@ class _StudyQuizScreen extends StatefulWidget {
 }
 
 class _StudyQuizScreenState extends State<_StudyQuizScreen> {
-  int _questionIndex = 0;
+  late final List<int> _questionQueue = List<int>.generate(
+    widget.level.questionCount <= 0 ? 1 : widget.level.questionCount,
+    (index) => index,
+  );
+  int _queueCursor = 0;
   String? _selectedAnswer;
   bool _showFeedback = false;
 
   @override
   Widget build(BuildContext context) {
+    final questionIndex = _questionQueue[_queueCursor];
     final quiz = const AdventureLevelQuizBuilder().buildForLevel(
       widget.level,
-      questionIndex: _questionIndex,
+      questionIndex: questionIndex,
     );
-    final questionCount =
-        widget.level.questionCount <= 0 ? 1 : widget.level.questionCount;
-    final isLastQuestion = _questionIndex >= questionCount - 1;
+    final isAnswerCorrect = _selectedAnswer == quiz.correctAnswer;
+    final isLastQueuedQuestion = _queueCursor >= _questionQueue.length - 1;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
@@ -1545,7 +1549,10 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           const SizedBox(height: 12),
         ],
         if (_showFeedback)
-          _AnswerFeedbackPanel(quiz: quiz)
+          _AnswerFeedbackPanel(
+            quiz: quiz,
+            isCorrect: isAnswerCorrect,
+          )
         else
           const SizedBox(height: 102),
         const SizedBox(height: 18),
@@ -1554,13 +1561,23 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           child: FilledButton(
             onPressed: _showFeedback
                 ? () {
-                    if (isLastQuestion) {
+                    final nextQueue = List<int>.of(_questionQueue);
+                    if (!isAnswerCorrect) {
+                      nextQueue.add(questionIndex);
+                    }
+
+                    final shouldComplete =
+                        isAnswerCorrect && isLastQueuedQuestion;
+                    if (shouldComplete) {
                       widget.onComplete();
                       return;
                     }
 
                     setState(() {
-                      _questionIndex += 1;
+                      _questionQueue
+                        ..clear()
+                        ..addAll(nextQueue);
+                      _queueCursor += 1;
                       _selectedAnswer = null;
                       _showFeedback = false;
                     });
@@ -1728,9 +1745,13 @@ class _LevelContextPanel extends StatelessWidget {
 }
 
 class _AnswerFeedbackPanel extends StatelessWidget {
-  const _AnswerFeedbackPanel({required this.quiz});
+  const _AnswerFeedbackPanel({
+    required this.quiz,
+    required this.isCorrect,
+  });
 
   final AdventureLevelQuiz quiz;
+  final bool isCorrect;
 
   @override
   Widget build(BuildContext context) {
@@ -1744,16 +1765,17 @@ class _AnswerFeedbackPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            quiz.successTitle,
-            style: const TextStyle(
-              color: Color(0xFF34C759),
+            isCorrect ? quiz.successTitle : quiz.failureTitle,
+            style: TextStyle(
+              color:
+                  isCorrect ? const Color(0xFF34C759) : const Color(0xFFFF9500),
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            quiz.explanation,
+            isCorrect ? quiz.explanation : quiz.failureExplanation,
             style: const TextStyle(
               color: Color(0xFF70727A),
               fontSize: 16,

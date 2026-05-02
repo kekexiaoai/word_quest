@@ -56,6 +56,47 @@ void main() {
     expect(find.text('喂食豆豆'), findsOneWidget);
   });
 
+  testWidgets('答错会进入稍后重试，答对重试题后才结算', (tester) async {
+    await _pumpHome(tester);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('library').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('再试一次'), findsOneWidget);
+    expect(find.text('这题会放到本关稍后再试。'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 / 6'), findsOneWidget);
+    expect(find.text('今天完成了'), findsNothing);
+
+    await _completeVisibleQuiz(tester, answers: const [
+      'neighbor',
+      'library',
+      'through',
+      'neighbor',
+      'library',
+    ]);
+
+    expect(find.text('今天完成了'), findsNothing);
+    expect(find.text('1 / 6'), findsOneWidget);
+
+    await tester.tap(find.text('through'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('今天完成了'), findsOneWidget);
+  });
+
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
     await _pumpHome(tester);
 
