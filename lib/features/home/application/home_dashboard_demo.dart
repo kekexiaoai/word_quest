@@ -2,6 +2,7 @@ import '../../child_profile/domain/child_profile.dart';
 import '../../study/application/study_task_planner.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
+import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_entry.dart';
 import '../domain/home_dashboard_snapshot.dart';
 import 'home_dashboard_builder.dart';
@@ -11,56 +12,28 @@ class HomeDashboardDemo {
 
   static List<ChildDashboardSnapshot> buildChildSnapshots({
     required HomeDashboardBuilder builder,
+    required List<ChildProfile> children,
     required DateTime referenceDate,
   }) {
-    final brotherTask = _buildTask(
-      childId: 'child-brother',
-      date: _sameDayAt(referenceDate, 18),
-      newWordLimit: 12,
-      reviewLimit: 24,
-      mistakeLimit: 6,
-      newWordPrefix: 'brother-new',
-      reviewPrefix: 'brother-review',
-      mistakePrefix: 'brother-mistake',
-    );
-    final sisterTask = _buildTask(
-      childId: 'child-sister',
-      date: _sameDayAt(referenceDate, 18),
-      newWordLimit: 8,
-      reviewLimit: 16,
-      mistakeLimit: 4,
-      newWordPrefix: 'sister-new',
-      reviewPrefix: 'sister-review',
-      mistakePrefix: 'sister-mistake',
-    );
-
     return [
-      builder.buildChildSnapshot(
-        child: ChildProfile(
-          id: 'child-brother',
-          name: '哥哥',
-          gradeLabel: '初中词表',
-          avatarSeed: '哥哥',
-          createdAt: referenceDate.subtract(const Duration(days: 1)),
+      for (final child in children)
+        _buildSnapshotForChild(
+          builder: builder,
+          child: child,
+          referenceDate: referenceDate,
         ),
-        todayTask: brotherTask,
-        answerRecords: _brotherRecords(),
-        completedItems: 29,
-        referenceDate: referenceDate,
-      ),
-      builder.buildChildSnapshot(
-        child: ChildProfile(
-          id: 'child-sister',
-          name: '妹妹',
-          gradeLabel: '小学高年级词表',
-          avatarSeed: '妹妹',
-          createdAt: referenceDate.subtract(const Duration(days: 1)),
+    ];
+  }
+
+  static List<DashboardSectionLine> buildBookHighlights(
+    List<WordBook> wordBooks,
+  ) {
+    return [
+      for (final wordBook in wordBooks)
+        DashboardSectionLine(
+          label: wordBook.name,
+          value: '${wordBook.wordCount} 个单词 · ${wordBook.stageLabel}',
         ),
-        todayTask: sisterTask,
-        answerRecords: _sisterRecords(),
-        completedItems: 12,
-        referenceDate: referenceDate,
-      ),
     ];
   }
 
@@ -280,6 +253,72 @@ class HomeDashboardDemo {
     return DateTime(
         referenceDate.year, referenceDate.month, referenceDate.day, hour);
   }
+
+  static ChildDashboardSnapshot _buildSnapshotForChild({
+    required HomeDashboardBuilder builder,
+    required ChildProfile child,
+    required DateTime referenceDate,
+  }) {
+    final seed = switch (child.id) {
+      'child-brother' => _SeedData(
+          task: _buildTask(
+            childId: child.id,
+            date: _sameDayAt(referenceDate, 18),
+            newWordLimit: 12,
+            reviewLimit: 24,
+            mistakeLimit: 6,
+            newWordPrefix: 'brother-new',
+            reviewPrefix: 'brother-review',
+            mistakePrefix: 'brother-mistake',
+          ),
+          answerRecords: _brotherRecords(),
+          completedItems: 29,
+        ),
+      'child-sister' => _SeedData(
+          task: _buildTask(
+            childId: child.id,
+            date: _sameDayAt(referenceDate, 18),
+            newWordLimit: 8,
+            reviewLimit: 16,
+            mistakeLimit: 4,
+            newWordPrefix: 'sister-new',
+            reviewPrefix: 'sister-review',
+            mistakePrefix: 'sister-mistake',
+          ),
+          answerRecords: _sisterRecords(),
+          completedItems: 12,
+        ),
+      _ => _SeedData(
+          task: StudyTask(
+            childId: child.id,
+            date: referenceDate,
+            items: const [],
+          ),
+          answerRecords: const [],
+          completedItems: 0,
+        ),
+    };
+
+    return builder.buildChildSnapshot(
+      child: child,
+      todayTask: seed.task,
+      answerRecords: seed.answerRecords,
+      completedItems: seed.completedItems,
+      referenceDate: referenceDate,
+    );
+  }
+}
+
+class _SeedData {
+  _SeedData({
+    required this.task,
+    required this.answerRecords,
+    required this.completedItems,
+  });
+
+  final StudyTask task;
+  final List<AnswerRecord> answerRecords;
+  final int completedItems;
 }
 
 class _RecordSeed {

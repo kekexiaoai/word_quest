@@ -16,4 +16,6 @@ class WordBook {
   final List<WordEntry> words;
   final String? description;
   final bool isBuiltIn;
+
+  int get wordCount => words.length;
 }

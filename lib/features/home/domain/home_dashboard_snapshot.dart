@@ -31,11 +31,13 @@ class ChildDashboardSnapshot {
 class HomeDashboardSnapshot {
   const HomeDashboardSnapshot({
     required this.children,
+    required this.bookHighlights,
     required this.todayHighlights,
     required this.parentHighlights,
   });
 
   final List<ChildDashboardSnapshot> children;
+  final List<DashboardSectionLine> bookHighlights;
   final List<DashboardSectionLine> todayHighlights;
   final List<DashboardSectionLine> parentHighlights;
 }

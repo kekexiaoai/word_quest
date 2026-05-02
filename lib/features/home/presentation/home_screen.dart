@@ -51,6 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             _ChildSummaryCard(child: currentChild),
             const SizedBox(height: 20),
+            _SectionPanel(
+              title: '内置词表',
+              rows: _dashboard.bookHighlights,
+            ),
+            const SizedBox(height: 20),
             const _SectionPanel(
               title: '今日学习主线',
               rows: [
