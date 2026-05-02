@@ -21,7 +21,9 @@ import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
 import '../../word_book/application/csv_word_book_importer.dart';
+import '../../word_book/application/local_learning_word_book_selection_repository.dart';
 import '../../word_book/application/local_word_book_repository.dart';
+import '../../word_book/domain/learning_word_book_selection_repository.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_book_repository.dart';
 
@@ -68,6 +70,7 @@ class HomeScreen extends StatefulWidget {
     this.adventureRepository,
     this.answerRecordRepository,
     this.wordBookRepository,
+    this.learningWordBookSelectionRepository,
     this.pronunciationPlayer,
   });
 
@@ -75,6 +78,8 @@ class HomeScreen extends StatefulWidget {
   final AdventureRepository? adventureRepository;
   final AnswerRecordRepository? answerRecordRepository;
   final WordBookRepository? wordBookRepository;
+  final LearningWordBookSelectionRepository?
+      learningWordBookSelectionRepository;
   final PronunciationPlayer? pronunciationPlayer;
 
   @override
@@ -88,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final AdventureRepository _adventureRepository;
   late final AnswerRecordRepository _answerRecordRepository;
   late final WordBookRepository _wordBookRepository;
+  late final LearningWordBookSelectionRepository
+      _learningWordBookSelectionRepository;
   late final PronunciationPlayer _pronunciationPlayer;
   late String _selectedChildId;
   late AdventureDashboardSnapshot _adventure;
@@ -106,6 +113,9 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.answerRecordRepository ?? LocalAnswerRecordRepository();
     _wordBookRepository =
         widget.wordBookRepository ?? LocalWordBookRepository();
+    _learningWordBookSelectionRepository =
+        widget.learningWordBookSelectionRepository ??
+            LocalLearningWordBookSelectionRepository();
     _pronunciationPlayer =
         widget.pronunciationPlayer ?? createDefaultPronunciationPlayer();
     final referenceDate = DateTime.now();
@@ -169,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 level: _activeLevel ?? _adventure.currentLevel,
                 answerRecordRepository: _answerRecordRepository,
                 wordBooks: _wordBookRepository.loadWordBooks(),
+                selectedWordBookId: _selectedWordBook?.id,
                 pronunciationPlayer: _pronunciationPlayer,
                 onClose: () {
                   setState(() {
@@ -249,16 +260,42 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       _HomeTab.wordBook => _WordBookTabView(
           wordBooks: _wordBookRepository.loadWordBooks(),
+          selectedWordBookId: _selectedWordBook?.id,
           onImportCsv: _importWordBookFromCsv,
         ),
       _HomeTab.settings => _SettingsTabView(
           currentChild: currentChild,
           children: _dashboard.children,
           isParentMode: _isParentMode,
+          selectedWordBookName: _selectedWordBook?.name ?? '尚未选择词表',
+          onSelectLearningWordBook: _openLearningWordBookSwitcher,
           onSwitchIdentity: _openIdentitySwitcher,
           onManageData: _openDataManagement,
         ),
     };
+  }
+
+  WordBook? get _selectedWordBook {
+    final wordBooks = _wordBookRepository.loadWordBooks();
+    if (wordBooks.isEmpty) {
+      return null;
+    }
+
+    final savedWordBookId = _learningWordBookSelectionRepository
+        .loadSelectedWordBookId(childId: _selectedChildId);
+    for (final wordBook in wordBooks) {
+      if (wordBook.id == savedWordBookId) {
+        return wordBook;
+      }
+    }
+
+    for (final wordBook in wordBooks) {
+      if (wordBook.stageLabel == _currentChild.gradeLabel) {
+        return wordBook;
+      }
+    }
+
+    return wordBooks.first;
   }
 
   ChildDashboardSnapshot get _currentChild {
@@ -304,6 +341,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openLearningWordBookSwitcher() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _LearningWordBookDialog(
+        wordBooks: _wordBookRepository.loadWordBooks(),
+        selectedWordBookId: _selectedWordBook?.id,
+        onSelect: (wordBookId) {
+          _learningWordBookSelectionRepository.saveSelectedWordBookId(
+            childId: _selectedChildId,
+            wordBookId: wordBookId,
+          );
+          Navigator.of(context).pop();
+          setState(() {});
+        },
+      ),
+    );
+  }
+
   Future<void> _openDataManagement() async {
     await showDialog<void>(
       context: context,
@@ -314,6 +369,11 @@ class _HomeScreenState extends State<HomeScreen> {
           adventureRepository: _adventureRepository is LocalAdventureRepository
               ? _adventureRepository
               : null,
+          learningWordBookSelectionRepository:
+              _learningWordBookSelectionRepository
+                      is LocalLearningWordBookSelectionRepository
+                  ? _learningWordBookSelectionRepository
+                  : null,
         ),
         onDataChanged: () {
           if (mounted) {
@@ -1338,10 +1398,12 @@ class _MapProgressCard extends StatelessWidget {
 class _WordBookTabView extends StatelessWidget {
   const _WordBookTabView({
     required this.wordBooks,
+    required this.selectedWordBookId,
     required this.onImportCsv,
   });
 
   final List<WordBook> wordBooks;
+  final String? selectedWordBookId;
   final VoidCallback onImportCsv;
 
   @override
@@ -1354,7 +1416,7 @@ class _WordBookTabView extends StatelessWidget {
       for (final wordBook in wordBooks)
         if (!wordBook.isBuiltIn) wordBook,
     ];
-    final currentWordBook = wordBooks.isEmpty ? null : wordBooks.first;
+    final currentWordBook = _selectedWordBook(wordBooks, selectedWordBookId);
 
     return ListView(
       padding: _tabContentPadding,
@@ -1447,6 +1509,15 @@ class _WordBookTabView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  WordBook? _selectedWordBook(List<WordBook> wordBooks, String? wordBookId) {
+    for (final wordBook in wordBooks) {
+      if (wordBook.id == wordBookId) {
+        return wordBook;
+      }
+    }
+    return wordBooks.isEmpty ? null : wordBooks.first;
   }
 }
 
@@ -1804,6 +1875,8 @@ class _SettingsTabView extends StatelessWidget {
     required this.currentChild,
     required this.children,
     required this.isParentMode,
+    required this.selectedWordBookName,
+    required this.onSelectLearningWordBook,
     required this.onSwitchIdentity,
     required this.onManageData,
   });
@@ -1811,6 +1884,8 @@ class _SettingsTabView extends StatelessWidget {
   final ChildDashboardSnapshot currentChild;
   final List<ChildDashboardSnapshot> children;
   final bool isParentMode;
+  final String selectedWordBookName;
+  final VoidCallback onSelectLearningWordBook;
   final VoidCallback onSwitchIdentity;
   final VoidCallback onManageData;
 
@@ -1850,6 +1925,22 @@ class _SettingsTabView extends StatelessWidget {
               iconBackground: Color(0xFFECEBFF),
               title: '家长管理',
               subtitle: '轻量看板',
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        const _SectionTitle('学习设置'),
+        const SizedBox(height: 14),
+        _GroupedList(
+          children: [
+            _RouteRow(
+              icon: Icons.menu_book_rounded,
+              iconColor: const Color(0xFF2F856F),
+              iconBackground: const Color(0xFFE5F8EC),
+              title: '默认学习词表',
+              subtitle: selectedWordBookName,
+              onTap: onSelectLearningWordBook,
+              key: const ValueKey('settings_learning_word_book'),
             ),
           ],
         ),
@@ -1974,6 +2065,46 @@ class _IdentitySwitcherDialog extends StatelessWidget {
   }
 }
 
+class _LearningWordBookDialog extends StatelessWidget {
+  const _LearningWordBookDialog({
+    required this.wordBooks,
+    required this.selectedWordBookId,
+    required this.onSelect,
+  });
+
+  final List<WordBook> wordBooks;
+  final String? selectedWordBookId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('默认学习词表'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final wordBook in wordBooks)
+            ListTile(
+              key: ValueKey('learning_word_book_${wordBook.id}'),
+              leading: Icon(
+                wordBook.isBuiltIn
+                    ? Icons.school_rounded
+                    : Icons.upload_file_rounded,
+              ),
+              title: Text(wordBook.name),
+              subtitle:
+                  Text('${wordBook.wordCount} 个单词 · ${wordBook.stageLabel}'),
+              trailing: wordBook.id == selectedWordBookId
+                  ? const Icon(Icons.check_rounded)
+                  : null,
+              onTap: () => onSelect(wordBook.id),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.name,
@@ -2053,6 +2184,7 @@ class _StudyQuizScreen extends StatefulWidget {
     required this.level,
     required this.answerRecordRepository,
     required this.wordBooks,
+    required this.selectedWordBookId,
     required this.pronunciationPlayer,
     required this.onClose,
     required this.onComplete,
@@ -2062,6 +2194,7 @@ class _StudyQuizScreen extends StatefulWidget {
   final AdventureLevel level;
   final AnswerRecordRepository answerRecordRepository;
   final List<WordBook> wordBooks;
+  final String? selectedWordBookId;
   final PronunciationPlayer pronunciationPlayer;
   final VoidCallback onClose;
   final VoidCallback onComplete;
@@ -2099,6 +2232,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
       questionIndex: questionIndex,
       wordBooks: widget.wordBooks,
       answerRecords: _answerRecordsSnapshot,
+      selectedWordBookId: widget.selectedWordBookId,
     );
     final isAnswerCorrect = _selectedAnswer == quiz.correctAnswer;
     final isLastQueuedQuestion = _queueCursor >= _questionQueue.length - 1;

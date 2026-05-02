@@ -97,6 +97,9 @@ void main() {
             ),
           ),
         ],
+        learningWordBookSelections: const {
+          'child-a': 'book-a',
+        },
       );
 
       final jsonText = codec.encode(package);
@@ -112,6 +115,7 @@ void main() {
           AnswerWeaknessType.listening);
       expect(decoded.adventureSnapshots.single.currentLevel.title, '错词 Boss 关');
       expect(decoded.adventureSnapshots.single.pet.level, 3);
+      expect(decoded.learningWordBookSelections['child-a'], 'book-a');
     });
 
     test('拒绝不支持的备份版本', () {

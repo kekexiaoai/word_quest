@@ -9,6 +9,7 @@ import 'package:word_quest/features/study/application/pronunciation_player.dart'
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
 import 'package:word_quest/features/word_book/application/in_memory_word_book_repository.dart';
+import 'package:word_quest/features/word_book/application/in_memory_learning_word_book_selection_repository.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
@@ -317,6 +318,33 @@ mountain,高山
     expect(find.text('家长看板'), findsOneWidget);
   });
 
+  testWidgets('设置页可以选择默认学习词表并驱动新词热身', (tester) async {
+    final selectionRepository = InMemoryLearningWordBookSelectionRepository();
+    await _pumpHome(tester, selectionRepository: selectionRepository);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_learning_word_book')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('learning_word_book_high-core')));
+    await tester.pumpAndSettle();
+
+    expect(
+      selectionRepository.loadSelectedWordBookId(childId: 'child-brother'),
+      'high-core',
+    );
+    expect(find.text('高中核心词表'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_quest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新词热身关'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('high-core-3'), findsWidgets);
+    expect(find.text('library'), findsNothing);
+  });
+
   testWidgets('底部导航可以切换到新版词表和设置页', (tester) async {
     await _pumpHome(tester);
 
@@ -334,7 +362,7 @@ mountain,高山
     await tester.tap(find.byKey(const ValueKey('home_tab_word_book')));
     await tester.pumpAndSettle();
 
-    expect(find.text('小学高年级基础词表'), findsWidgets);
+    expect(find.text('初中核心词表'), findsWidgets);
     expect(find.text('词表'), findsWidgets);
     expect(find.text('搜索单词、释义或标签'), findsOneWidget);
     expect(find.text('18'), findsOneWidget);
@@ -505,8 +533,8 @@ mountain,高山
     expect(find.text('新词热身'), findsOneWidget);
     expect(find.text('1 / 8'), findsOneWidget);
     expect(find.text('看单词，选择中文意思'), findsOneWidget);
-    expect(find.text('library'), findsWidgets);
-    expect(find.text('图书馆'), findsOneWidget);
+    expect(find.text('middle-core-3'), findsWidgets);
+    expect(find.text('释义 3'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
@@ -630,6 +658,7 @@ Future<void> _pumpHome(
   InMemoryAdventureRepository? adventureRepository,
   InMemoryAnswerRecordRepository? answerRecordRepository,
   InMemoryWordBookRepository? wordBookRepository,
+  InMemoryLearningWordBookSelectionRepository? selectionRepository,
   PronunciationPlayer? pronunciationPlayer,
 }) async {
   tester.view.physicalSize = const Size(430, 932);
@@ -647,6 +676,7 @@ Future<void> _pumpHome(
           InMemoryAnswerRecordRepository(storage: answerStorage),
       wordBookRepository:
           wordBookRepository ?? const InMemoryWordBookRepository(),
+      learningWordBookSelectionRepository: selectionRepository,
       pronunciationPlayer: pronunciationPlayer,
     ),
   ));

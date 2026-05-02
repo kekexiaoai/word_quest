@@ -11,6 +11,7 @@ class BackupPackage {
     required this.wordBooks,
     this.answerRecords = const [],
     this.adventureSnapshots = const [],
+    this.learningWordBookSelections = const {},
   });
 
   final int schemaVersion;
@@ -19,4 +20,5 @@ class BackupPackage {
   final List<WordBook> wordBooks;
   final List<AnswerRecord> answerRecords;
   final List<AdventureDashboardSnapshot> adventureSnapshots;
+  final Map<String, String> learningWordBookSelections;
 }

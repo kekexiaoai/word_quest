@@ -68,6 +68,46 @@ void main() {
     expect(quiz.choices, containsAll(['海洋', '河流']));
   });
 
+  test('新词热身关按当前学习词表生成题组', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[0],
+      selectedWordBookId: 'middle-core',
+      wordBooks: const [
+        WordBook(
+          id: 'primary-basic',
+          name: '小学高年级基础词表',
+          stageLabel: '小学高年级词表',
+          isBuiltIn: true,
+          words: [
+            WordEntry(id: 'library', spelling: 'library', meanings: ['图书馆']),
+          ],
+        ),
+        WordBook(
+          id: 'middle-core',
+          name: '初中核心词表',
+          stageLabel: '初中词表',
+          isBuiltIn: true,
+          words: [
+            WordEntry(id: 'energy', spelling: 'energy', meanings: ['能量']),
+            WordEntry(id: 'planet', spelling: 'planet', meanings: ['行星']),
+          ],
+        ),
+      ],
+    );
+
+    expect(quiz.wordId, 'energy');
+    expect(quiz.prompt, 'energy');
+    expect(quiz.correctAnswer, '能量');
+    expect(quiz.choices, contains('行星'));
+  });
+
   test('题组会按题号更新进度和题面', () {
     const repository = InMemoryAdventureRepository();
     const builder = AdventureLevelQuizBuilder();

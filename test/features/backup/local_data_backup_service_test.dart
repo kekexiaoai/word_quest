@@ -6,6 +6,7 @@ import 'package:word_quest/features/backup/application/local_data_backup_service
 import 'package:word_quest/features/study/application/local_answer_record_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/word_book/application/local_learning_word_book_selection_repository.dart';
 import 'package:word_quest/features/word_book/application/local_word_book_repository.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
@@ -16,10 +17,13 @@ void main() {
     final wordBookRepository = LocalWordBookRepository(store: store);
     final answerRecordRepository = LocalAnswerRecordRepository(store: store);
     final adventureRepository = LocalAdventureRepository(store: store);
+    final selectionRepository =
+        LocalLearningWordBookSelectionRepository(store: store);
     final service = LocalDataBackupService(
       wordBookRepository: wordBookRepository,
       answerRecordRepository: answerRecordRepository,
       adventureRepository: adventureRepository,
+      learningWordBookSelectionRepository: selectionRepository,
     );
 
     wordBookRepository.saveImportedWordBook(
@@ -41,6 +45,10 @@ void main() {
       elapsedMilliseconds: 1200,
       weaknessType: AnswerWeaknessType.listening,
     ));
+    selectionRepository.saveSelectedWordBookId(
+      childId: 'child-brother',
+      wordBookId: 'csv-import-1',
+    );
     const controller = AdventureSessionController();
     final adventure = adventureRepository.loadAdventure(
       childId: 'child-brother',
@@ -63,10 +71,13 @@ void main() {
         LocalAnswerRecordRepository(store: targetStore);
     final targetAdventureRepository =
         LocalAdventureRepository(store: targetStore);
+    final targetSelectionRepository =
+        LocalLearningWordBookSelectionRepository(store: targetStore);
     final targetService = LocalDataBackupService(
       wordBookRepository: targetWordBookRepository,
       answerRecordRepository: targetAnswerRecordRepository,
       adventureRepository: targetAdventureRepository,
+      learningWordBookSelectionRepository: targetSelectionRepository,
     );
 
     targetService.importBackup(backupJson);
@@ -84,6 +95,12 @@ void main() {
     );
     expect(restoredAdventure.currentLevel.title, '错词 Boss 关');
     expect(restoredAdventure.pet.level, 3);
+    expect(
+      targetSelectionRepository.loadSelectedWordBookId(
+        childId: 'child-brother',
+      ),
+      'csv-import-1',
+    );
   });
 
   test('本地数据备份服务可以清空学习记录但保留词表', () {

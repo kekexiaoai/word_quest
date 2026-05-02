@@ -64,6 +64,10 @@ class BackupPackageCodec {
         for (final item in _optionalList(decoded, 'adventureSnapshots'))
           _adventureSnapshotFromJson(_asMap(item, 'adventureSnapshots')),
       ],
+      learningWordBookSelections: _optionalStringMap(
+        decoded,
+        'learningWordBookSelections',
+      ),
     );
   }
 
@@ -84,6 +88,7 @@ class BackupPackageCodec {
         for (final snapshot in package.adventureSnapshots)
           _adventureSnapshotToJson(snapshot),
       ],
+      'learningWordBookSelections': package.learningWordBookSelections,
     };
   }
 
@@ -432,6 +437,27 @@ class BackupPackageCodec {
         else
           throw BackupPackageFormatException('字段 $field 必须是字符串列表'),
     ];
+  }
+
+  Map<String, String> _optionalStringMap(
+    Map<String, dynamic> json,
+    String field,
+  ) {
+    final value = json[field];
+    if (value == null) {
+      return const {};
+    }
+    if (value is! Map<String, dynamic>) {
+      throw BackupPackageFormatException('字段 $field 必须是对象');
+    }
+    final result = <String, String>{};
+    for (final entry in value.entries) {
+      if (entry.value is! String) {
+        throw BackupPackageFormatException('字段 $field 的值必须是字符串');
+      }
+      result[entry.key] = entry.value as String;
+    }
+    return result;
   }
 
   Map<String, dynamic> _asMap(dynamic value, String field) {

@@ -13,11 +13,12 @@ class AdventureLevelQuizBuilder {
     int questionIndex = 0,
     List<WordBook> wordBooks = const [],
     List<AnswerRecord> answerRecords = const [],
+    String? selectedWordBookId,
   }) {
     final wordCatalog = _wordCatalogFrom(wordBooks);
     return switch (level.type) {
       AdventureLevelType.newWordWarmup =>
-        _newWordWarmup(level, questionIndex, wordCatalog),
+        _newWordWarmup(level, questionIndex, wordCatalog, selectedWordBookId),
       AdventureLevelType.reviewExplore =>
         _reviewExplore(level, questionIndex, answerRecords, wordCatalog),
       AdventureLevelType.mistakeBoss =>
@@ -31,12 +32,16 @@ class AdventureLevelQuizBuilder {
     AdventureLevel level,
     int questionIndex,
     List<_KnownWord> wordCatalog,
+    String? selectedWordBookId,
   ) {
-    final newWords = [
-      for (final word in wordCatalog)
-        if (!word.isBuiltIn) word,
-      if (!wordCatalog.any((word) => !word.isBuiltIn)) ...wordCatalog,
-    ];
+    final selectedWords = _wordsInBook(wordCatalog, selectedWordBookId);
+    final newWords = selectedWords.isNotEmpty
+        ? selectedWords
+        : [
+            for (final word in wordCatalog)
+              if (!word.isBuiltIn) word,
+            if (!wordCatalog.any((word) => !word.isBuiltIn)) ...wordCatalog,
+          ];
 
     if (newWords.isNotEmpty) {
       final word = _seedAt(newWords, questionIndex);
@@ -299,6 +304,20 @@ class AdventureLevelQuizBuilder {
 
     records.sort((a, b) => b.answeredAt.compareTo(a.answeredAt));
     return records;
+  }
+
+  List<_KnownWord> _wordsInBook(
+    List<_KnownWord> wordCatalog,
+    String? wordBookId,
+  ) {
+    if (wordBookId == null || wordBookId.trim().isEmpty) {
+      return const [];
+    }
+
+    return [
+      for (final word in wordCatalog)
+        if (word.wordBookId == wordBookId) word,
+    ];
   }
 
   List<_KnownWord> _wordCatalogFrom(List<WordBook> wordBooks) {

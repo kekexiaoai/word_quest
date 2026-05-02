@@ -1,6 +1,7 @@
 import '../../adventure/application/local_adventure_repository.dart';
 import '../../child_profile/domain/child_profile.dart';
 import '../../study/domain/answer_record_repository.dart';
+import '../../word_book/application/local_learning_word_book_selection_repository.dart';
 import '../../word_book/domain/word_book_repository.dart';
 import '../domain/backup_package.dart';
 import 'backup_package_codec.dart';
@@ -10,6 +11,7 @@ class LocalDataBackupService {
     required this.wordBookRepository,
     required this.answerRecordRepository,
     this.adventureRepository,
+    this.learningWordBookSelectionRepository,
     this.children = const [],
     this.codec = const BackupPackageCodec(),
   });
@@ -17,6 +19,8 @@ class LocalDataBackupService {
   final WordBookRepository wordBookRepository;
   final AnswerRecordRepository answerRecordRepository;
   final LocalAdventureRepository? adventureRepository;
+  final LocalLearningWordBookSelectionRepository?
+      learningWordBookSelectionRepository;
   final List<ChildProfile> children;
   final BackupPackageCodec codec;
 
@@ -30,6 +34,8 @@ class LocalDataBackupService {
         answerRecords: answerRecordRepository.loadAllRecords(),
         adventureSnapshots:
             adventureRepository?.loadSavedAdventures() ?? const [],
+        learningWordBookSelections:
+            learningWordBookSelectionRepository?.loadSelections() ?? const {},
       ),
     );
   }
@@ -45,6 +51,9 @@ class LocalDataBackupService {
     answerRecordRepository.replaceRecords(backupPackage.answerRecords);
     adventureRepository?.replaceSavedAdventures(
       backupPackage.adventureSnapshots,
+    );
+    learningWordBookSelectionRepository?.replaceSelections(
+      backupPackage.learningWordBookSelections,
     );
   }
 
