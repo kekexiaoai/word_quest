@@ -3,6 +3,7 @@ import 'package:word_quest/features/adventure/application/adventure_level_quiz_b
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/study/domain/word_learning_progress.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
@@ -106,6 +107,84 @@ void main() {
     expect(quiz.prompt, 'energy');
     expect(quiz.correctAnswer, '能量');
     expect(quiz.choices, contains('行星'));
+  });
+
+  test('新词热身关会跳过当前词表中已掌握的单词', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[0],
+      selectedWordBookId: 'middle-core',
+      wordBooks: const [
+        WordBook(
+          id: 'middle-core',
+          name: '初中核心词表',
+          stageLabel: '初中词表',
+          isBuiltIn: true,
+          words: [
+            WordEntry(id: 'energy', spelling: 'energy', meanings: ['能量']),
+            WordEntry(id: 'planet', spelling: 'planet', meanings: ['行星']),
+          ],
+        ),
+      ],
+      learningProgresses: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'energy',
+          masteryLevel: 3,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 6, 1),
+          updatedAt: DateTime(2026, 5, 2),
+        ),
+      ],
+    );
+
+    expect(quiz.wordId, 'planet');
+    expect(quiz.prompt, 'planet');
+    expect(quiz.correctAnswer, '行星');
+  });
+
+  test('新词热身关没有指定词表时也会跳过已掌握的导入词', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[0],
+      wordBooks: const [
+        WordBook(
+          id: 'custom',
+          name: '我的导入词表',
+          stageLabel: '自定义',
+          words: [
+            WordEntry(id: 'custom-ocean', spelling: 'ocean', meanings: ['海洋']),
+            WordEntry(id: 'custom-river', spelling: 'river', meanings: ['河流']),
+          ],
+        ),
+      ],
+      learningProgresses: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'custom-ocean',
+          masteryLevel: 3,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 6, 1),
+          updatedAt: DateTime(2026, 5, 2),
+        ),
+      ],
+    );
+
+    expect(quiz.wordId, 'custom-river');
+    expect(quiz.prompt, 'river');
+    expect(quiz.correctAnswer, '河流');
   });
 
   test('题组会按题号更新进度和题面', () {

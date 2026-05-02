@@ -7,6 +7,7 @@ import 'package:word_quest/features/backup/domain/backup_package.dart';
 import 'package:word_quest/features/child_profile/domain/child_profile.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/study/domain/word_learning_progress.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
@@ -55,6 +56,17 @@ void main() {
             answeredAt: DateTime(2026, 5, 2, 9, 35),
             elapsedMilliseconds: 1400,
             weaknessType: AnswerWeaknessType.listening,
+          ),
+        ],
+        wordLearningProgresses: [
+          WordLearningProgress(
+            childId: 'child-a',
+            wordId: 'word-a',
+            masteryLevel: 3,
+            consecutiveMistakes: 0,
+            nextReviewAt: DateTime(2026, 5, 9),
+            updatedAt: DateTime(2026, 5, 2, 9, 36),
+            lastWeaknessType: AnswerWeaknessType.listening,
           ),
         ],
         adventureSnapshots: [
@@ -112,6 +124,9 @@ void main() {
       expect(decoded.wordBooks.single.words.single.tags, ['水果']);
       expect(decoded.answerRecords.single.wordId, 'word-a');
       expect(decoded.answerRecords.single.weaknessType,
+          AnswerWeaknessType.listening);
+      expect(decoded.wordLearningProgresses.single.isMastered, isTrue);
+      expect(decoded.wordLearningProgresses.single.lastWeaknessType,
           AnswerWeaknessType.listening);
       expect(decoded.adventureSnapshots.single.currentLevel.title, '错词 Boss 关');
       expect(decoded.adventureSnapshots.single.pet.level, 3);

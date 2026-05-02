@@ -1,6 +1,7 @@
 import '../../adventure/application/local_adventure_repository.dart';
 import '../../child_profile/domain/child_profile.dart';
 import '../../study/domain/answer_record_repository.dart';
+import '../../study/domain/word_learning_progress_repository.dart';
 import '../../word_book/application/local_learning_word_book_selection_repository.dart';
 import '../../word_book/domain/word_book_repository.dart';
 import '../domain/backup_package.dart';
@@ -10,6 +11,7 @@ class LocalDataBackupService {
   const LocalDataBackupService({
     required this.wordBookRepository,
     required this.answerRecordRepository,
+    this.wordLearningProgressRepository,
     this.adventureRepository,
     this.learningWordBookSelectionRepository,
     this.children = const [],
@@ -18,6 +20,7 @@ class LocalDataBackupService {
 
   final WordBookRepository wordBookRepository;
   final AnswerRecordRepository answerRecordRepository;
+  final WordLearningProgressRepository? wordLearningProgressRepository;
   final LocalAdventureRepository? adventureRepository;
   final LocalLearningWordBookSelectionRepository?
       learningWordBookSelectionRepository;
@@ -32,6 +35,8 @@ class LocalDataBackupService {
         children: children,
         wordBooks: wordBookRepository.loadImportedWordBooks(),
         answerRecords: answerRecordRepository.loadAllRecords(),
+        wordLearningProgresses:
+            wordLearningProgressRepository?.loadAllProgresses() ?? const [],
         adventureSnapshots:
             adventureRepository?.loadSavedAdventures() ?? const [],
         learningWordBookSelections:
@@ -49,6 +54,9 @@ class LocalDataBackupService {
       ],
     );
     answerRecordRepository.replaceRecords(backupPackage.answerRecords);
+    wordLearningProgressRepository?.replaceProgresses(
+      backupPackage.wordLearningProgresses,
+    );
     adventureRepository?.replaceSavedAdventures(
       backupPackage.adventureSnapshots,
     );
@@ -59,5 +67,6 @@ class LocalDataBackupService {
 
   void clearLearningRecords() {
     answerRecordRepository.clearRecords();
+    wordLearningProgressRepository?.replaceProgresses(const []);
   }
 }

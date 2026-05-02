@@ -21,6 +21,8 @@ class WordLearningProgress {
 
   bool get isMistake => consecutiveMistakes > 0;
 
+  bool get isMastered => masteryLevel >= 3 && consecutiveMistakes == 0;
+
   WordLearningProgress copyWith({
     int? masteryLevel,
     int? consecutiveMistakes,

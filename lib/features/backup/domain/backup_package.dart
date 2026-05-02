@@ -1,6 +1,7 @@
 import '../../child_profile/domain/child_profile.dart';
 import '../../adventure/domain/adventure_dashboard_snapshot.dart';
 import '../../study/domain/answer_record.dart';
+import '../../study/domain/word_learning_progress.dart';
 import '../../word_book/domain/word_book.dart';
 
 class BackupPackage {
@@ -10,6 +11,7 @@ class BackupPackage {
     required this.children,
     required this.wordBooks,
     this.answerRecords = const [],
+    this.wordLearningProgresses = const [],
     this.adventureSnapshots = const [],
     this.learningWordBookSelections = const {},
   });
@@ -19,6 +21,7 @@ class BackupPackage {
   final List<ChildProfile> children;
   final List<WordBook> wordBooks;
   final List<AnswerRecord> answerRecords;
+  final List<WordLearningProgress> wordLearningProgresses;
   final List<AdventureDashboardSnapshot> adventureSnapshots;
   final Map<String, String> learningWordBookSelections;
 }

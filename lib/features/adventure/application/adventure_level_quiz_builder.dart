@@ -2,6 +2,7 @@ import '../domain/adventure_level.dart';
 import '../domain/adventure_level_quiz.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
+import '../../study/domain/word_learning_progress.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_entry.dart';
 
@@ -13,12 +14,18 @@ class AdventureLevelQuizBuilder {
     int questionIndex = 0,
     List<WordBook> wordBooks = const [],
     List<AnswerRecord> answerRecords = const [],
+    List<WordLearningProgress> learningProgresses = const [],
     String? selectedWordBookId,
   }) {
     final wordCatalog = _wordCatalogFrom(wordBooks);
     return switch (level.type) {
-      AdventureLevelType.newWordWarmup =>
-        _newWordWarmup(level, questionIndex, wordCatalog, selectedWordBookId),
+      AdventureLevelType.newWordWarmup => _newWordWarmup(
+          level,
+          questionIndex,
+          wordCatalog,
+          selectedWordBookId,
+          learningProgresses,
+        ),
       AdventureLevelType.reviewExplore =>
         _reviewExplore(level, questionIndex, answerRecords, wordCatalog),
       AdventureLevelType.mistakeBoss =>
@@ -33,15 +40,21 @@ class AdventureLevelQuizBuilder {
     int questionIndex,
     List<_KnownWord> wordCatalog,
     String? selectedWordBookId,
+    List<WordLearningProgress> learningProgresses,
   ) {
-    final selectedWords = _wordsInBook(wordCatalog, selectedWordBookId);
+    final selectedWords = _unmasteredWords(
+      level,
+      _wordsInBook(wordCatalog, selectedWordBookId),
+      learningProgresses,
+    );
+    final fallbackWords = [
+      for (final word in wordCatalog)
+        if (!word.isBuiltIn) word,
+      if (!wordCatalog.any((word) => !word.isBuiltIn)) ...wordCatalog,
+    ];
     final newWords = selectedWords.isNotEmpty
         ? selectedWords
-        : [
-            for (final word in wordCatalog)
-              if (!word.isBuiltIn) word,
-            if (!wordCatalog.any((word) => !word.isBuiltIn)) ...wordCatalog,
-          ];
+        : _unmasteredWords(level, fallbackWords, learningProgresses);
 
     if (newWords.isNotEmpty) {
       final word = _seedAt(newWords, questionIndex);
@@ -318,6 +331,28 @@ class AdventureLevelQuizBuilder {
       for (final word in wordCatalog)
         if (word.wordBookId == wordBookId) word,
     ];
+  }
+
+  List<_KnownWord> _unmasteredWords(
+    AdventureLevel level,
+    List<_KnownWord> words,
+    List<WordLearningProgress> learningProgresses,
+  ) {
+    if (words.isEmpty) {
+      return const [];
+    }
+
+    final masteredWordIds = {
+      for (final progress in learningProgresses)
+        if (progress.childId == level.childId && progress.isMastered)
+          progress.wordId,
+    };
+    final unmasteredWords = [
+      for (final word in words)
+        if (!masteredWordIds.contains(word.id)) word,
+    ];
+
+    return unmasteredWords.isEmpty ? words : unmasteredWords;
   }
 
   List<_KnownWord> _wordCatalogFrom(List<WordBook> wordBooks) {

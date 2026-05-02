@@ -15,11 +15,15 @@ import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
 import '../../study/application/local_answer_record_repository.dart';
+import '../../study/application/local_word_learning_progress_repository.dart';
 import '../../study/application/pronunciation_player.dart';
 import '../../study/application/study_answer_evaluator.dart';
+import '../../study/application/study_progress_updater.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
+import '../../study/domain/word_learning_progress.dart';
+import '../../study/domain/word_learning_progress_repository.dart';
 import '../../word_book/application/csv_word_book_importer.dart';
 import '../../word_book/application/local_learning_word_book_selection_repository.dart';
 import '../../word_book/application/local_word_book_repository.dart';
@@ -69,6 +73,7 @@ class HomeScreen extends StatefulWidget {
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
     this.adventureRepository,
     this.answerRecordRepository,
+    this.wordLearningProgressRepository,
     this.wordBookRepository,
     this.learningWordBookSelectionRepository,
     this.pronunciationPlayer,
@@ -77,6 +82,7 @@ class HomeScreen extends StatefulWidget {
   final HomeDashboardRepository dashboardRepository;
   final AdventureRepository? adventureRepository;
   final AnswerRecordRepository? answerRecordRepository;
+  final WordLearningProgressRepository? wordLearningProgressRepository;
   final WordBookRepository? wordBookRepository;
   final LearningWordBookSelectionRepository?
       learningWordBookSelectionRepository;
@@ -92,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HomeDashboardSnapshot _dashboard;
   late final AdventureRepository _adventureRepository;
   late final AnswerRecordRepository _answerRecordRepository;
+  late final WordLearningProgressRepository _wordLearningProgressRepository;
   late final WordBookRepository _wordBookRepository;
   late final LearningWordBookSelectionRepository
       _learningWordBookSelectionRepository;
@@ -111,6 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.adventureRepository ?? LocalAdventureRepository();
     _answerRecordRepository =
         widget.answerRecordRepository ?? LocalAnswerRecordRepository();
+    _wordLearningProgressRepository = widget.wordLearningProgressRepository ??
+        LocalWordLearningProgressRepository();
     _wordBookRepository =
         widget.wordBookRepository ?? LocalWordBookRepository();
     _learningWordBookSelectionRepository =
@@ -178,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 childId: currentChild.id,
                 level: _activeLevel ?? _adventure.currentLevel,
                 answerRecordRepository: _answerRecordRepository,
+                wordLearningProgressRepository: _wordLearningProgressRepository,
                 wordBooks: _wordBookRepository.loadWordBooks(),
                 selectedWordBookId: _selectedWordBook?.id,
                 pronunciationPlayer: _pronunciationPlayer,
@@ -366,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
         service: LocalDataBackupService(
           wordBookRepository: _wordBookRepository,
           answerRecordRepository: _answerRecordRepository,
+          wordLearningProgressRepository: _wordLearningProgressRepository,
           adventureRepository: _adventureRepository is LocalAdventureRepository
               ? _adventureRepository
               : null,
@@ -2183,6 +2194,7 @@ class _StudyQuizScreen extends StatefulWidget {
     required this.childId,
     required this.level,
     required this.answerRecordRepository,
+    required this.wordLearningProgressRepository,
     required this.wordBooks,
     required this.selectedWordBookId,
     required this.pronunciationPlayer,
@@ -2193,6 +2205,7 @@ class _StudyQuizScreen extends StatefulWidget {
   final String childId;
   final AdventureLevel level;
   final AnswerRecordRepository answerRecordRepository;
+  final WordLearningProgressRepository wordLearningProgressRepository;
   final List<WordBook> wordBooks;
   final String? selectedWordBookId;
   final PronunciationPlayer pronunciationPlayer;
@@ -2205,8 +2218,10 @@ class _StudyQuizScreen extends StatefulWidget {
 
 class _StudyQuizScreenState extends State<_StudyQuizScreen> {
   static const _answerEvaluator = StudyAnswerEvaluator();
+  static const _progressUpdater = StudyProgressUpdater();
 
   late final List<AnswerRecord> _answerRecordsSnapshot;
+  late final List<WordLearningProgress> _learningProgressSnapshot;
   late final List<int> _questionQueue = List<int>.generate(
     widget.level.questionCount <= 0 ? 1 : widget.level.questionCount,
     (index) => index,
@@ -2222,6 +2237,8 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
     _answerRecordsSnapshot = widget.answerRecordRepository.loadRecords(
       childId: widget.childId,
     );
+    _learningProgressSnapshot = widget.wordLearningProgressRepository
+        .loadProgresses(childId: widget.childId);
   }
 
   @override
@@ -2232,6 +2249,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
       questionIndex: questionIndex,
       wordBooks: widget.wordBooks,
       answerRecords: _answerRecordsSnapshot,
+      learningProgresses: _learningProgressSnapshot,
       selectedWordBookId: widget.selectedWordBookId,
     );
     final isAnswerCorrect = _selectedAnswer == quiz.correctAnswer;
@@ -2362,6 +2380,24 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                     elapsedMilliseconds <= 0 ? 1 : elapsedMilliseconds,
               );
               widget.answerRecordRepository.addRecord(record);
+              final previousProgress =
+                  widget.wordLearningProgressRepository.loadProgress(
+                childId: widget.childId,
+                wordId: quiz.wordId,
+              );
+              final nextProgress = _progressUpdater.applyAnswer(
+                progress: previousProgress ??
+                    WordLearningProgress(
+                      childId: widget.childId,
+                      wordId: quiz.wordId,
+                      masteryLevel: 0,
+                      consecutiveMistakes: 0,
+                      nextReviewAt: answeredAt,
+                      updatedAt: answeredAt,
+                    ),
+                answer: record,
+              );
+              widget.wordLearningProgressRepository.saveProgress(nextProgress);
 
               setState(() {
                 _selectedAnswer = answer;

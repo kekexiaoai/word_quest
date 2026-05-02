@@ -6,6 +6,7 @@ import '../../adventure/domain/pet_profile.dart';
 import '../../child_profile/domain/child_profile.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
+import '../../study/domain/word_learning_progress.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_entry.dart';
 import '../domain/backup_package.dart';
@@ -60,6 +61,12 @@ class BackupPackageCodec {
         for (final item in _optionalList(decoded, 'answerRecords'))
           _answerRecordFromJson(_asMap(item, 'answerRecords')),
       ],
+      wordLearningProgresses: [
+        for (final item in _optionalList(decoded, 'wordLearningProgresses'))
+          _wordLearningProgressFromJson(
+            _asMap(item, 'wordLearningProgresses'),
+          ),
+      ],
       adventureSnapshots: [
         for (final item in _optionalList(decoded, 'adventureSnapshots'))
           _adventureSnapshotFromJson(_asMap(item, 'adventureSnapshots')),
@@ -83,6 +90,10 @@ class BackupPackageCodec {
       ],
       'answerRecords': [
         for (final record in package.answerRecords) _answerRecordToJson(record),
+      ],
+      'wordLearningProgresses': [
+        for (final progress in package.wordLearningProgresses)
+          _wordLearningProgressToJson(progress),
       ],
       'adventureSnapshots': [
         for (final snapshot in package.adventureSnapshots)
@@ -189,6 +200,35 @@ class BackupPackageCodec {
       elapsedMilliseconds: _requiredInt(json, 'elapsedMilliseconds'),
       weaknessType:
           _weaknessTypeFromName(_optionalString(json, 'weaknessType')),
+    );
+  }
+
+  Map<String, Object?> _wordLearningProgressToJson(
+    WordLearningProgress progress,
+  ) {
+    return {
+      'childId': progress.childId,
+      'wordId': progress.wordId,
+      'masteryLevel': progress.masteryLevel,
+      'consecutiveMistakes': progress.consecutiveMistakes,
+      'nextReviewAt': progress.nextReviewAt.toIso8601String(),
+      'updatedAt': progress.updatedAt.toIso8601String(),
+      'lastWeaknessType': progress.lastWeaknessType?.name,
+    };
+  }
+
+  WordLearningProgress _wordLearningProgressFromJson(
+    Map<String, dynamic> json,
+  ) {
+    return WordLearningProgress(
+      childId: _requiredString(json, 'childId'),
+      wordId: _requiredString(json, 'wordId'),
+      masteryLevel: _requiredInt(json, 'masteryLevel'),
+      consecutiveMistakes: _requiredInt(json, 'consecutiveMistakes'),
+      nextReviewAt: _requiredDateTime(json, 'nextReviewAt'),
+      updatedAt: _requiredDateTime(json, 'updatedAt'),
+      lastWeaknessType:
+          _weaknessTypeFromName(_optionalString(json, 'lastWeaknessType')),
     );
   }
 

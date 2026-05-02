@@ -4,8 +4,10 @@ import 'package:word_quest/features/adventure/application/adventure_session_cont
 import 'package:word_quest/features/adventure/application/local_adventure_repository.dart';
 import 'package:word_quest/features/backup/application/local_data_backup_service.dart';
 import 'package:word_quest/features/study/application/local_answer_record_repository.dart';
+import 'package:word_quest/features/study/application/local_word_learning_progress_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/study/domain/word_learning_progress.dart';
 import 'package:word_quest/features/word_book/application/local_learning_word_book_selection_repository.dart';
 import 'package:word_quest/features/word_book/application/local_word_book_repository.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
@@ -19,11 +21,14 @@ void main() {
     final adventureRepository = LocalAdventureRepository(store: store);
     final selectionRepository =
         LocalLearningWordBookSelectionRepository(store: store);
+    final wordLearningProgressRepository =
+        LocalWordLearningProgressRepository(store: store);
     final service = LocalDataBackupService(
       wordBookRepository: wordBookRepository,
       answerRecordRepository: answerRecordRepository,
       adventureRepository: adventureRepository,
       learningWordBookSelectionRepository: selectionRepository,
+      wordLearningProgressRepository: wordLearningProgressRepository,
     );
 
     wordBookRepository.saveImportedWordBook(
@@ -49,6 +54,15 @@ void main() {
       childId: 'child-brother',
       wordBookId: 'csv-import-1',
     );
+    wordLearningProgressRepository.saveProgress(WordLearningProgress(
+      childId: 'child-brother',
+      wordId: 'csv-import-1-1',
+      masteryLevel: 3,
+      consecutiveMistakes: 0,
+      nextReviewAt: DateTime(2026, 5, 9),
+      updatedAt: DateTime(2026, 5, 2, 20),
+      lastWeaknessType: AnswerWeaknessType.listening,
+    ));
     const controller = AdventureSessionController();
     final adventure = adventureRepository.loadAdventure(
       childId: 'child-brother',
@@ -73,11 +87,14 @@ void main() {
         LocalAdventureRepository(store: targetStore);
     final targetSelectionRepository =
         LocalLearningWordBookSelectionRepository(store: targetStore);
+    final targetWordLearningProgressRepository =
+        LocalWordLearningProgressRepository(store: targetStore);
     final targetService = LocalDataBackupService(
       wordBookRepository: targetWordBookRepository,
       answerRecordRepository: targetAnswerRecordRepository,
       adventureRepository: targetAdventureRepository,
       learningWordBookSelectionRepository: targetSelectionRepository,
+      wordLearningProgressRepository: targetWordLearningProgressRepository,
     );
 
     targetService.importBackup(backupJson);
@@ -101,15 +118,24 @@ void main() {
       ),
       'csv-import-1',
     );
+    expect(
+      targetWordLearningProgressRepository
+          .loadProgress(childId: 'child-brother', wordId: 'csv-import-1-1')
+          ?.isMastered,
+      isTrue,
+    );
   });
 
   test('本地数据备份服务可以清空学习记录但保留词表', () {
     final store = MemoryLocalKeyValueStore();
     final wordBookRepository = LocalWordBookRepository(store: store);
     final answerRecordRepository = LocalAnswerRecordRepository(store: store);
+    final wordLearningProgressRepository =
+        LocalWordLearningProgressRepository(store: store);
     final service = LocalDataBackupService(
       wordBookRepository: wordBookRepository,
       answerRecordRepository: answerRecordRepository,
+      wordLearningProgressRepository: wordLearningProgressRepository,
     );
 
     wordBookRepository.saveImportedWordBook(
@@ -130,11 +156,22 @@ void main() {
       answeredAt: DateTime(2026, 5, 2, 20),
       elapsedMilliseconds: 900,
     ));
+    wordLearningProgressRepository.saveProgress(WordLearningProgress(
+      childId: 'child-brother',
+      wordId: 'csv-import-1-1',
+      masteryLevel: 1,
+      consecutiveMistakes: 0,
+      nextReviewAt: DateTime(2026, 5, 3),
+      updatedAt: DateTime(2026, 5, 2, 20),
+    ));
 
     service.clearLearningRecords();
 
     expect(
         answerRecordRepository.loadRecords(childId: 'child-brother'), isEmpty);
+    expect(
+        wordLearningProgressRepository.loadProgresses(childId: 'child-brother'),
+        isEmpty);
     expect(wordBookRepository.loadWordBooks().where((book) => !book.isBuiltIn),
         isNotEmpty);
   });

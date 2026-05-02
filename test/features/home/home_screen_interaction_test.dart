@@ -5,9 +5,11 @@ import 'package:word_quest/features/adventure/application/in_memory_adventure_re
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/home/presentation/home_screen.dart';
 import 'package:word_quest/features/study/application/in_memory_answer_record_repository.dart';
+import 'package:word_quest/features/study/application/in_memory_word_learning_progress_repository.dart';
 import 'package:word_quest/features/study/application/pronunciation_player.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/study/domain/word_learning_progress.dart';
 import 'package:word_quest/features/word_book/application/in_memory_word_book_repository.dart';
 import 'package:word_quest/features/word_book/application/in_memory_learning_word_book_selection_repository.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
@@ -122,7 +124,15 @@ void main() {
   testWidgets('答题会写入学习记录并标记薄弱类型', (tester) async {
     final storage = <AnswerRecord>[];
     final recordRepository = InMemoryAnswerRecordRepository(storage: storage);
-    await _pumpHome(tester, answerRecordRepository: recordRepository);
+    final progressStorage = <WordLearningProgress>[];
+    final progressRepository = InMemoryWordLearningProgressRepository(
+      storage: progressStorage,
+    );
+    await _pumpHome(
+      tester,
+      answerRecordRepository: recordRepository,
+      wordLearningProgressRepository: progressRepository,
+    );
 
     await tester
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
@@ -146,6 +156,13 @@ void main() {
     expect(storage.last.wordId, 'neighbor');
     expect(storage.last.isCorrect, isTrue);
     expect(storage.last.weaknessType, isNull);
+    expect(progressStorage, hasLength(2));
+    expect(progressStorage.first.wordId, 'through');
+    expect(progressStorage.first.masteryLevel, 0);
+    expect(
+        progressStorage.first.lastWeaknessType, AnswerWeaknessType.listening);
+    expect(progressStorage.last.wordId, 'neighbor');
+    expect(progressStorage.last.masteryLevel, 1);
   });
 
   testWidgets('继续学习会根据学习记录进入薄弱点复习', (tester) async {
@@ -657,6 +674,7 @@ Future<void> _pumpHome(
   WidgetTester tester, {
   InMemoryAdventureRepository? adventureRepository,
   InMemoryAnswerRecordRepository? answerRecordRepository,
+  InMemoryWordLearningProgressRepository? wordLearningProgressRepository,
   InMemoryWordBookRepository? wordBookRepository,
   InMemoryLearningWordBookSelectionRepository? selectionRepository,
   PronunciationPlayer? pronunciationPlayer,
@@ -674,6 +692,7 @@ Future<void> _pumpHome(
           adventureRepository ?? InMemoryAdventureRepository(storage: storage),
       answerRecordRepository: answerRecordRepository ??
           InMemoryAnswerRecordRepository(storage: answerStorage),
+      wordLearningProgressRepository: wordLearningProgressRepository,
       wordBookRepository:
           wordBookRepository ?? const InMemoryWordBookRepository(),
       learningWordBookSelectionRepository: selectionRepository,
