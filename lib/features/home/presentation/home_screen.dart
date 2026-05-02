@@ -8,7 +8,7 @@ enum _HomeTab {
   today,
   quest,
   wordBook,
-  family,
+  settings,
 }
 
 class HomeScreen extends StatefulWidget {
@@ -25,7 +25,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeDashboardSnapshot _dashboard;
-  int _selectedChildIndex = 0;
   _HomeTab _selectedTab = _HomeTab.today;
   bool _isStudying = false;
 
@@ -39,9 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentChild = _dashboard.children[_selectedChildIndex];
-    final reminderChild =
-        _dashboard.children.length > 1 ? _dashboard.children[1] : currentChild;
+    final currentChild = _dashboard.children.first;
 
     if (_isStudying) {
       return Scaffold(
@@ -87,28 +84,17 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
-            child: _buildTabContent(currentChild, reminderChild),
+            child: _buildTabContent(currentChild),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTabContent(
-    ChildDashboardSnapshot currentChild,
-    ChildDashboardSnapshot reminderChild,
-  ) {
+  Widget _buildTabContent(ChildDashboardSnapshot currentChild) {
     return switch (_selectedTab) {
       _HomeTab.today => _TodayTabView(
-          dashboard: _dashboard,
           currentChild: currentChild,
-          reminderChild: reminderChild,
-          selectedChildIndex: _selectedChildIndex,
-          onChildChanged: (index) {
-            setState(() {
-              _selectedChildIndex = index;
-            });
-          },
           onContinue: () {
             setState(() {
               _isStudying = true;
@@ -117,26 +103,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       _HomeTab.quest => const _QuestTabView(),
       _HomeTab.wordBook => _WordBookTabView(rows: _dashboard.bookHighlights),
-      _HomeTab.family => _FamilyTabView(children: _dashboard.children),
+      _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
     };
   }
 }
 
 class _TodayTabView extends StatelessWidget {
   const _TodayTabView({
-    required this.dashboard,
     required this.currentChild,
-    required this.reminderChild,
-    required this.selectedChildIndex,
-    required this.onChildChanged,
     required this.onContinue,
   });
 
-  final HomeDashboardSnapshot dashboard;
   final ChildDashboardSnapshot currentChild;
-  final ChildDashboardSnapshot reminderChild;
-  final int selectedChildIndex;
-  final ValueChanged<int> onChildChanged;
   final VoidCallback onContinue;
 
   @override
@@ -146,12 +124,6 @@ class _TodayTabView extends StatelessWidget {
       children: [
         const _Header(title: '今天', eyebrow: 'Word Quest'),
         const SizedBox(height: 28),
-        _ChildSegment(
-          children: dashboard.children,
-          selectedIndex: selectedChildIndex,
-          onChanged: onChildChanged,
-        ),
-        const SizedBox(height: 18),
         _TodayTaskCard(
           child: currentChild,
           onContinue: onContinue,
@@ -160,14 +132,6 @@ class _TodayTabView extends StatelessWidget {
         const _SectionTitle('学习路线'),
         const SizedBox(height: 14),
         const _LearningRouteList(),
-        const SizedBox(height: 28),
-        const _SectionTitle('内置词表'),
-        const SizedBox(height: 14),
-        _WordBookList(rows: dashboard.bookHighlights),
-        const SizedBox(height: 28),
-        const _SectionTitle('家长提醒'),
-        const SizedBox(height: 14),
-        _ParentReminderCard(childName: reminderChild.name),
       ],
     );
   }
@@ -225,61 +189,6 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ChildSegment extends StatelessWidget {
-  const _ChildSegment({
-    required this.children,
-    required this.selectedIndex,
-    required this.onChanged,
-  });
-
-  final List<ChildDashboardSnapshot> children;
-  final int selectedIndex;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE2E2E8),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          for (var index = 0; index < children.length; index++)
-            Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOut,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selectedIndex == index
-                        ? Colors.white
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    children[index].name,
-                    style: TextStyle(
-                      color: const Color(0xFF111114),
-                      fontSize: 16,
-                      fontWeight: selectedIndex == index
-                          ? FontWeight.w800
-                          : FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -656,69 +565,6 @@ class _RouteRow extends StatelessWidget {
   }
 }
 
-class _ParentReminderCard extends StatelessWidget {
-  const _ParentReminderCard({required this.childName});
-
-  final String childName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFECEBFF),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.shield_outlined,
-              color: Color(0xFF5856D6),
-              size: 30,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$childName 今天还未开始',
-                  style: const TextStyle(
-                    color: Color(0xFF111114),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '建议晚饭前安排 10 分钟复习。',
-                  style: TextStyle(
-                    color: Color(0xFF70727A),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: Color(0xFF9B9BA3),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _QuestTabView extends StatelessWidget {
   const _QuestTabView();
 
@@ -841,10 +687,10 @@ class _WordBookTabView extends StatelessWidget {
   }
 }
 
-class _FamilyTabView extends StatelessWidget {
-  const _FamilyTabView({required this.children});
+class _SettingsTabView extends StatelessWidget {
+  const _SettingsTabView({required this.currentChild});
 
-  final List<ChildDashboardSnapshot> children;
+  final ChildDashboardSnapshot currentChild;
 
   @override
   Widget build(BuildContext context) {
@@ -852,51 +698,36 @@ class _FamilyTabView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       children: [
         const _Header(
-          title: '家庭',
-          eyebrow: '本地优先',
+          title: '设置',
+          eyebrow: '账号与角色',
           trailingIcon: Icons.settings_outlined,
         ),
         const SizedBox(height: 28),
-        Row(
-          children: [
-            const Expanded(
-              child: _MetricTile(
-                value: '1/2',
-                label: '今日完成',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricTile(
-                value: _averageAccuracy(children),
-                label: '平均正确率',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        const _SectionTitle('孩子状态'),
+        const _SectionTitle('当前学习者'),
         const SizedBox(height: 14),
         _GroupedList(
           children: [
-            for (final child in children)
-              _RouteRow(
-                icon: Icons.person_rounded,
-                iconColor: const Color(0xFF34C759),
-                iconBackground: const Color(0xFFE5F8EC),
-                title: child.name,
-                subtitle: '${child.taskSummary} · 正确率 ${child.accuracyLabel}',
-                status: child.progress > 0
-                    ? '${(child.progress * 100).round()}%'
-                    : '提醒',
-                statusColor: child.progress > 0
-                    ? const Color(0xFF34C759)
-                    : const Color(0xFFFF9500),
-              ),
+            _RouteRow(
+              icon: Icons.person_rounded,
+              iconColor: const Color(0xFF34C759),
+              iconBackground: const Color(0xFFE5F8EC),
+              title: currentChild.name,
+              subtitle:
+                  '${currentChild.taskSummary} · 正确率 ${currentChild.accuracyLabel}',
+              status: '${(currentChild.progress * 100).round()}%',
+              statusColor: const Color(0xFF34C759),
+            ),
+            const _RouteRow(
+              icon: Icons.switch_account_rounded,
+              iconColor: Color(0xFF007AFF),
+              iconBackground: Color(0xFFE5F2FF),
+              title: '角色切换',
+              subtitle: '切换学习者或进入家长模式',
+            ),
           ],
         ),
         const SizedBox(height: 28),
-        const _SectionTitle('管理'),
+        const _SectionTitle('数据管理'),
         const SizedBox(height: 14),
         const _GroupedList(
           children: [
@@ -945,18 +776,6 @@ class _FamilyTabView extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  static String _averageAccuracy(List<ChildDashboardSnapshot> children) {
-    final values = [
-      for (final child in children)
-        int.tryParse(child.accuracyLabel.replaceAll('%', '')) ?? 0,
-    ];
-    if (values.isEmpty) {
-      return '0%';
-    }
-    final average = values.reduce((a, b) => a + b) / values.length;
-    return '${average.round()}%';
   }
 }
 
@@ -1311,11 +1130,11 @@ class _BottomTabBar extends StatelessWidget {
               onTap: () => onChanged(_HomeTab.wordBook),
             ),
             _TabItem(
-              tapKey: const ValueKey('home_tab_family'),
-              icon: Icons.group_outlined,
-              label: '家庭',
-              isActive: selectedTab == _HomeTab.family,
-              onTap: () => onChanged(_HomeTab.family),
+              tapKey: const ValueKey('home_tab_settings'),
+              icon: Icons.settings_outlined,
+              label: '设置',
+              isActive: selectedTab == _HomeTab.settings,
+              onTap: () => onChanged(_HomeTab.settings),
             ),
           ],
         ),
