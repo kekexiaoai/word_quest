@@ -6,4 +6,6 @@ abstract class WordBookRepository {
   List<WordBook> loadWordBooks();
 
   List<WordBook> loadBuiltInWordBooks();
+
+  void saveImportedWordBook(WordBook wordBook);
 }

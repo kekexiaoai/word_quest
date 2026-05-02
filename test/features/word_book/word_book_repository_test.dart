@@ -34,4 +34,28 @@ void main() {
     expect(wordBooks.map((book) => book.id), contains('custom'));
     expect(wordBooks.last.words.single.spelling, 'ocean');
   });
+
+  test('内存词表仓库保存导入词表后可以立即读取', () {
+    final importedStorage = <WordBook>[];
+    final repository = InMemoryWordBookRepository(
+      importedWordBooks: importedStorage,
+    );
+
+    repository.saveImportedWordBook(
+      const WordBook(
+        id: 'csv-import-1',
+        name: 'CSV 导入词表',
+        stageLabel: '自定义',
+        words: [
+          WordEntry(id: 'csv-import-1-1', spelling: 'ocean', meanings: ['海洋']),
+        ],
+      ),
+    );
+
+    final wordBooks = repository.loadWordBooks();
+
+    expect(importedStorage, hasLength(1));
+    expect(wordBooks.last.id, 'csv-import-1');
+    expect(wordBooks.last.words.single.spelling, 'ocean');
+  });
 }

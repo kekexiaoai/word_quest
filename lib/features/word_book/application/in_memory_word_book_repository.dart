@@ -4,16 +4,22 @@ import '../domain/word_entry.dart';
 
 class InMemoryWordBookRepository implements WordBookRepository {
   const InMemoryWordBookRepository({
-    this.importedWordBooks = const [],
-  });
+    List<WordBook>? importedWordBooks,
+  }) : _importedWordBooks = importedWordBooks;
 
-  final List<WordBook> importedWordBooks;
+  static final List<WordBook> _sharedImportedWordBooks = [];
+
+  final List<WordBook>? _importedWordBooks;
+
+  List<WordBook> get _activeImportedWordBooks {
+    return _importedWordBooks ?? _sharedImportedWordBooks;
+  }
 
   @override
   List<WordBook> loadWordBooks() {
     return [
       ...loadBuiltInWordBooks(),
-      ...importedWordBooks,
+      ..._activeImportedWordBooks,
     ];
   }
 
@@ -42,6 +48,12 @@ class InMemoryWordBookRepository implements WordBookRepository {
         words: _words('high-core', 6),
       ),
     ];
+  }
+
+  @override
+  void saveImportedWordBook(WordBook wordBook) {
+    _activeImportedWordBooks.removeWhere((book) => book.id == wordBook.id);
+    _activeImportedWordBooks.add(wordBook);
   }
 
   List<WordEntry> _words(String prefix, int count) {

@@ -16,6 +16,7 @@ import '../../study/application/study_answer_evaluator.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
+import '../../word_book/application/csv_word_book_importer.dart';
 import '../../word_book/application/in_memory_word_book_repository.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_book_repository.dart';
@@ -223,9 +224,49 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
         ),
-      _HomeTab.wordBook => const _WordBookTabView(),
+      _HomeTab.wordBook => _WordBookTabView(
+          wordBooks: widget.wordBookRepository.loadWordBooks(),
+          onImportCsv: _importWordBookFromCsv,
+        ),
       _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
     };
+  }
+
+  Future<void> _importWordBookFromCsv() async {
+    final formData = await showDialog<_CsvImportFormData>(
+      context: context,
+      builder: (context) => const _CsvImportDialog(),
+    );
+    if (formData == null || !mounted) {
+      return;
+    }
+
+    final importedCount = widget.wordBookRepository
+        .loadWordBooks()
+        .where((wordBook) => !wordBook.isBuiltIn)
+        .length;
+    final result = const CsvWordBookImporter().import(
+      id: 'csv-import-${importedCount + 1}',
+      name: formData.name.trim().isEmpty ? 'CSV 导入词表' : formData.name.trim(),
+      stageLabel: '自定义',
+      csvText: formData.csvText,
+    );
+
+    if (!mounted) {
+      return;
+    }
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.errors.join('\n'))),
+      );
+      return;
+    }
+
+    widget.wordBookRepository.saveImportedWordBook(result.wordBook!);
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已导入 ${result.wordBook!.wordCount} 个单词')),
+    );
   }
 }
 
@@ -500,13 +541,11 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.title,
     required this.eyebrow,
-    this.trailingIcon = Icons.person_outline_rounded,
     this.trailing,
   });
 
   final String title;
   final String eyebrow;
-  final IconData trailingIcon;
   final Widget? trailing;
 
   @override
@@ -537,20 +576,78 @@ class _Header extends StatelessWidget {
           ),
         ),
         trailing ??
-            Container(
+            const _CircleIcon(
               width: 58,
               height: 58,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                trailingIcon,
-                color: const Color(0xFF2F856F),
-                size: 30,
-              ),
+              icon: Icons.person_outline_rounded,
             ),
       ],
+    );
+  }
+}
+
+class _CircleIcon extends StatelessWidget {
+  const _CircleIcon({
+    required this.width,
+    required this.height,
+    required this.icon,
+  });
+
+  final double width;
+  final double height;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        icon,
+        color: const Color(0xFF2F856F),
+        size: 30,
+      ),
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 58,
+            height: 58,
+            child: Icon(
+              icon,
+              color: const Color(0xFF2F856F),
+              size: 30,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1133,51 +1230,82 @@ class _MapProgressCard extends StatelessWidget {
 }
 
 class _WordBookTabView extends StatelessWidget {
-  const _WordBookTabView();
+  const _WordBookTabView({
+    required this.wordBooks,
+    required this.onImportCsv,
+  });
+
+  final List<WordBook> wordBooks;
+  final VoidCallback onImportCsv;
 
   @override
   Widget build(BuildContext context) {
+    final totalWordCount = wordBooks.fold<int>(
+      0,
+      (total, wordBook) => total + wordBook.wordCount,
+    );
+    final importedWordBooks = [
+      for (final wordBook in wordBooks)
+        if (!wordBook.isBuiltIn) wordBook,
+    ];
+    final currentWordBook = wordBooks.isEmpty ? null : wordBooks.first;
+
     return ListView(
       padding: _tabContentPadding,
-      children: const [
+      children: [
         _Header(
           title: '词表',
-          eyebrow: '小学高年级基础词表',
-          trailingIcon: Icons.add_rounded,
+          eyebrow: currentWordBook?.name ?? '尚未选择词表',
+          trailing: _CircleIconButton(
+            key: const ValueKey('word_book_import_button'),
+            icon: Icons.add_rounded,
+            tooltip: '导入 CSV 词表',
+            onTap: onImportCsv,
+          ),
         ),
-        SizedBox(height: 28),
-        _SearchBox(label: '搜索单词、释义或标签'),
-        SizedBox(height: 28),
+        const SizedBox(height: 28),
+        const _SearchBox(label: '搜索单词、释义或标签'),
+        const SizedBox(height: 28),
         Row(
           children: [
             Expanded(
               child: _MetricTile(
-                value: '240',
+                value: '$totalWordCount',
                 label: '词表总量',
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: _MetricTile(
-                value: '12',
-                label: '待复习错词',
+                value: '${importedWordBooks.length}',
+                label: '导入词表',
               ),
             ),
           ],
         ),
-        SizedBox(height: 28),
-        _SectionTitle('分类'),
-        SizedBox(height: 14),
+        const SizedBox(height: 28),
+        const _SectionTitle('分类'),
+        const SizedBox(height: 14),
         _GroupedList(
           children: [
             _RouteRow(
               icon: Icons.layers_rounded,
-              iconColor: Color(0xFF2F856F),
-              iconBackground: Color(0xFFE5F8EC),
-              title: '当前词表',
-              subtitle: '小学高年级基础 · 掌握 126 个',
+              iconColor: const Color(0xFF2F856F),
+              iconBackground: const Color(0xFFE5F8EC),
+              title: currentWordBook?.name ?? '当前词表',
+              subtitle: currentWordBook == null
+                  ? '暂无词表'
+                  : '${currentWordBook.wordCount} 个单词 · ${currentWordBook.stageLabel}',
             ),
-            _RouteRow(
+            for (final wordBook in importedWordBooks)
+              _RouteRow(
+                icon: Icons.upload_file_rounded,
+                iconColor: const Color(0xFF5856D6),
+                iconBackground: const Color(0xFFECEBFF),
+                title: wordBook.name,
+                subtitle: '${wordBook.wordCount} 个单词 · ${wordBook.stageLabel}',
+              ),
+            const _RouteRow(
               icon: Icons.warning_amber_rounded,
               iconColor: Color(0xFFFF9500),
               iconBackground: Color(0xFFFFF2D9),
@@ -1186,10 +1314,10 @@ class _WordBookTabView extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 28),
-        _SectionTitle('最近练过'),
-        SizedBox(height: 14),
-        _GroupedList(
+        const SizedBox(height: 28),
+        const _SectionTitle('最近练过'),
+        const SizedBox(height: 14),
+        const _GroupedList(
           children: [
             _RouteRow(
               icon: Icons.abc_rounded,
@@ -1248,6 +1376,98 @@ class _SearchBox extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CsvImportFormData {
+  const _CsvImportFormData({
+    required this.name,
+    required this.csvText,
+  });
+
+  final String name;
+  final String csvText;
+}
+
+class _CsvImportDialog extends StatefulWidget {
+  const _CsvImportDialog();
+
+  @override
+  State<_CsvImportDialog> createState() => _CsvImportDialogState();
+}
+
+class _CsvImportDialogState extends State<_CsvImportDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _csvController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: 'CSV 导入词表');
+    _csvController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _csvController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('导入 CSV 词表'),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const ValueKey('word_book_import_name_input'),
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: '词表名称',
+                  hintText: '例如：海洋主题词表',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                key: const ValueKey('word_book_import_csv_input'),
+                controller: _csvController,
+                minLines: 8,
+                maxLines: 12,
+                decoration: const InputDecoration(
+                  alignLabelWithHint: true,
+                  labelText: 'CSV 内容',
+                  hintText: '单词,中文释义\nocean,海洋\nriver,河流',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const ValueKey('word_book_import_submit'),
+          onPressed: () {
+            Navigator.of(context).pop(
+              _CsvImportFormData(
+                name: _nameController.text,
+                csvText: _csvController.text,
+              ),
+            );
+          },
+          child: const Text('导入'),
+        ),
+      ],
     );
   }
 }

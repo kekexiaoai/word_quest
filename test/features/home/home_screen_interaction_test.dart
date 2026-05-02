@@ -201,6 +201,63 @@ void main() {
     expect(find.text('river'), findsOneWidget);
   });
 
+  testWidgets('词表页导入 CSV 后关卡可以立即使用导入词', (tester) async {
+    final importedStorage = <WordBook>[];
+    final wordBookRepository = InMemoryWordBookRepository(
+      importedWordBooks: importedStorage,
+    );
+    final answerRecordRepository = InMemoryAnswerRecordRepository(storage: [
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'csv-import-1-1',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+    ]);
+    await _pumpHome(
+      tester,
+      answerRecordRepository: answerRecordRepository,
+      wordBookRepository: wordBookRepository,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_word_book')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('word_book_import_button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('word_book_import_name_input')),
+      '海洋主题词表',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('word_book_import_csv_input')),
+      '''
+单词,中文释义
+ocean,海洋
+river,河流
+mountain,高山
+''',
+    );
+    await tester.tap(find.byKey(const ValueKey('word_book_import_submit')));
+    await tester.pumpAndSettle();
+
+    expect(importedStorage, hasLength(1));
+    expect(find.text('海洋主题词表'), findsOneWidget);
+    expect(find.text('3 个单词 · 自定义'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_today')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('薄弱点复习'), findsOneWidget);
+    expect(find.text('ocean'), findsWidgets);
+    expect(find.text('river'), findsOneWidget);
+  });
+
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
     await _pumpHome(tester);
 
@@ -239,12 +296,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('home_tab_word_book')));
     await tester.pumpAndSettle();
 
-    expect(find.text('小学高年级基础词表'), findsOneWidget);
+    expect(find.text('小学高年级基础词表'), findsWidgets);
     expect(find.text('词表'), findsWidgets);
     expect(find.text('搜索单词、释义或标签'), findsOneWidget);
-    expect(find.text('240'), findsOneWidget);
-    expect(find.text('待复习错词'), findsOneWidget);
-    expect(find.text('当前词表'), findsOneWidget);
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('导入词表'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('word_book_import_button')), findsOneWidget);
     expect(find.text('最近练过'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
