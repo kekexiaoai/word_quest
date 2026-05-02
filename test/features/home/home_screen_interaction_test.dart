@@ -95,8 +95,14 @@ void main() {
     await _pumpHome(tester);
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    final bodySafeArea = tester.widget<SafeArea>(
+      find.byWidgetPredicate(
+        (widget) => widget is SafeArea && widget.child is Center,
+      ),
+    );
 
     expect(scaffold.extendBody, isTrue);
+    expect(bodySafeArea.bottom, isFalse);
   });
 }
 

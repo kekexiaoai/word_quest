@@ -119,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: SafeArea(
+        bottom: false,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
