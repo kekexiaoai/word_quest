@@ -1,9 +1,13 @@
+import '../../study/domain/study_task.dart';
+
 class AdventureLevelQuiz {
   const AdventureLevelQuiz({
     required this.activityTitle,
     required this.progressLabel,
     required this.progressValue,
     required this.instruction,
+    required this.wordId,
+    required this.practiceMode,
     required this.prompt,
     required this.correctAnswer,
     required this.choices,
@@ -18,6 +22,8 @@ class AdventureLevelQuiz {
   final String progressLabel;
   final double progressValue;
   final String instruction;
+  final String wordId;
+  final PracticeMode practiceMode;
   final String prompt;
   final String correctAnswer;
   final List<String> choices;

@@ -11,6 +11,10 @@ import '../../adventure/domain/pet_profile.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
+import '../../study/application/in_memory_answer_record_repository.dart';
+import '../../study/application/study_answer_evaluator.dart';
+import '../../study/domain/answer_record_repository.dart';
+import '../../study/domain/study_question.dart';
 
 enum _HomeTab {
   today,
@@ -53,10 +57,12 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
     this.adventureRepository = const InMemoryAdventureRepository(),
+    this.answerRecordRepository = const InMemoryAnswerRecordRepository(),
   });
 
   final HomeDashboardRepository dashboardRepository;
   final AdventureRepository adventureRepository;
+  final AnswerRecordRepository answerRecordRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -131,7 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyQuizScreen(
+                childId: currentChild.id,
                 level: _activeLevel ?? _adventure.currentLevel,
+                answerRecordRepository: widget.answerRecordRepository,
                 onClose: () {
                   setState(() {
                     _isStudying = false;
@@ -1409,12 +1417,16 @@ class _ProfileCard extends StatelessWidget {
 
 class _StudyQuizScreen extends StatefulWidget {
   const _StudyQuizScreen({
+    required this.childId,
     required this.level,
+    required this.answerRecordRepository,
     required this.onClose,
     required this.onComplete,
   });
 
+  final String childId;
   final AdventureLevel level;
+  final AnswerRecordRepository answerRecordRepository;
   final VoidCallback onClose;
   final VoidCallback onComplete;
 
@@ -1423,11 +1435,14 @@ class _StudyQuizScreen extends StatefulWidget {
 }
 
 class _StudyQuizScreenState extends State<_StudyQuizScreen> {
+  static const _answerEvaluator = StudyAnswerEvaluator();
+
   late final List<int> _questionQueue = List<int>.generate(
     widget.level.questionCount <= 0 ? 1 : widget.level.questionCount,
     (index) => index,
   );
   int _queueCursor = 0;
+  DateTime _questionStartedAt = DateTime.now();
   String? _selectedAnswer;
   bool _showFeedback = false;
 
@@ -1540,6 +1555,29 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
             isCorrect: answer == quiz.correctAnswer,
             showFeedback: _showFeedback,
             onTap: () {
+              if (_showFeedback) {
+                return;
+              }
+              final answeredAt = DateTime.now();
+              final elapsedMilliseconds =
+                  answeredAt.difference(_questionStartedAt).inMilliseconds;
+              final record = _answerEvaluator.evaluate(
+                childId: widget.childId,
+                question: StudyQuestion(
+                  wordId: quiz.wordId,
+                  practiceMode: quiz.practiceMode,
+                  type: StudyQuestionType.choice,
+                  prompt: quiz.prompt,
+                  correctAnswer: quiz.correctAnswer,
+                  choices: quiz.choices,
+                ),
+                submittedAnswer: answer,
+                answeredAt: answeredAt,
+                elapsedMilliseconds:
+                    elapsedMilliseconds <= 0 ? 1 : elapsedMilliseconds,
+              );
+              widget.answerRecordRepository.addRecord(record);
+
               setState(() {
                 _selectedAnswer = answer;
                 _showFeedback = true;
@@ -1580,6 +1618,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                       _queueCursor += 1;
                       _selectedAnswer = null;
                       _showFeedback = false;
+                      _questionStartedAt = DateTime.now();
                     });
                   }
                 : null,

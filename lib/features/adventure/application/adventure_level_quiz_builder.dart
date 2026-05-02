@@ -1,5 +1,6 @@
 import '../domain/adventure_level.dart';
 import '../domain/adventure_level_quiz.dart';
+import '../../study/domain/study_task.dart';
 
 class AdventureLevelQuizBuilder {
   const AdventureLevelQuizBuilder();
@@ -32,6 +33,8 @@ class AdventureLevelQuizBuilder {
       progressLabel: _progressLabel(level, questionIndex),
       progressValue: _progressValue(level, questionIndex),
       instruction: '看单词，选择中文意思',
+      wordId: seed.prompt,
+      practiceMode: PracticeMode.englishToChinese,
       prompt: seed.prompt,
       correctAnswer: seed.correctAnswer,
       choices: const ['图书馆', '邻居', '穿过'],
@@ -68,6 +71,8 @@ class AdventureLevelQuizBuilder {
       progressLabel: _progressLabel(level, questionIndex),
       progressValue: _progressValue(level, questionIndex),
       instruction: '听发音，选择对应单词',
+      wordId: seed.prompt,
+      practiceMode: PracticeMode.listeningChoice,
       prompt: seed.prompt,
       correctAnswer: seed.correctAnswer,
       choices: const ['neighbor', 'library', 'through'],
@@ -92,6 +97,8 @@ class AdventureLevelQuizBuilder {
       progressLabel: _progressLabel(level, questionIndex),
       progressValue: _progressValue(level, questionIndex),
       instruction: '收服迷雾单词',
+      wordId: seed.prompt,
+      practiceMode: PracticeMode.englishToChinese,
       prompt: seed.prompt,
       correctAnswer: seed.correctAnswer,
       choices: const ['穿过', '图书馆', '邻居'],
@@ -107,6 +114,8 @@ class AdventureLevelQuizBuilder {
       progressLabel: _progressLabel(level, questionIndex),
       progressValue: 1,
       instruction: '打开宝箱前，回顾今天的收获',
+      wordId: 'daily-chest',
+      practiceMode: PracticeMode.chineseToEnglish,
       prompt: '今天完成关卡后会获得什么？',
       correctAnswer: '星星、食物和宠物成长',
       choices: ['星星、食物和宠物成长', '排名惩罚', '随机抽卡'],

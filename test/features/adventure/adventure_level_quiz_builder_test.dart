@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/adventure/application/adventure_level_quiz_builder.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
+import 'package:word_quest/features/study/domain/study_task.dart';
 
 void main() {
   test('新词热身关生成看词选义题组', () {
@@ -17,6 +18,8 @@ void main() {
     expect(quiz.progressLabel, '1 / 8');
     expect(quiz.instruction, '看单词，选择中文意思');
     expect(quiz.prompt, 'library');
+    expect(quiz.wordId, 'library');
+    expect(quiz.practiceMode, PracticeMode.englishToChinese);
     expect(quiz.correctAnswer, '图书馆');
     expect(quiz.choices, contains('图书馆'));
   });
@@ -57,6 +60,8 @@ void main() {
     expect(quiz.progressLabel, '1 / 6');
     expect(quiz.instruction, '听发音，选择对应单词');
     expect(quiz.prompt, 'through');
+    expect(quiz.wordId, 'through');
+    expect(quiz.practiceMode, PracticeMode.listeningChoice);
     expect(quiz.correctAnswer, 'through');
     expect(quiz.choices, ['neighbor', 'library', 'through']);
   });

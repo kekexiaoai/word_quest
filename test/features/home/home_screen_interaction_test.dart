@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/home/presentation/home_screen.dart';
+import 'package:word_quest/features/study/application/in_memory_answer_record_repository.dart';
+import 'package:word_quest/features/study/domain/answer_record.dart';
+import 'package:word_quest/features/study/domain/study_task.dart';
 
 void main() {
   testWidgets('点击继续学习进入做题页', (tester) async {
@@ -95,6 +98,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('今天完成了'), findsOneWidget);
+  });
+
+  testWidgets('答题会写入学习记录并标记薄弱类型', (tester) async {
+    final storage = <AnswerRecord>[];
+    final recordRepository = InMemoryAnswerRecordRepository(storage: storage);
+    await _pumpHome(tester, answerRecordRepository: recordRepository);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('library').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('neighbor'));
+    await tester.pumpAndSettle();
+
+    expect(storage, hasLength(2));
+    expect(storage.first.childId, 'child-brother');
+    expect(storage.first.wordId, 'through');
+    expect(storage.first.practiceMode, PracticeMode.listeningChoice);
+    expect(storage.first.isCorrect, isFalse);
+    expect(storage.first.weaknessType, AnswerWeaknessType.listening);
+    expect(storage.first.elapsedMilliseconds, greaterThan(0));
+    expect(storage.last.wordId, 'neighbor');
+    expect(storage.last.isCorrect, isTrue);
+    expect(storage.last.weaknessType, isNull);
   });
 
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
@@ -304,6 +336,7 @@ Future<void> _completeVisibleQuiz(
 Future<void> _pumpHome(
   WidgetTester tester, {
   InMemoryAdventureRepository? adventureRepository,
+  InMemoryAnswerRecordRepository? answerRecordRepository,
 }) async {
   tester.view.physicalSize = const Size(430, 932);
   tester.view.devicePixelRatio = 1;
@@ -315,6 +348,8 @@ Future<void> _pumpHome(
     home: HomeScreen(
       adventureRepository:
           adventureRepository ?? InMemoryAdventureRepository(storage: storage),
+      answerRecordRepository:
+          answerRecordRepository ?? const InMemoryAnswerRecordRepository(),
     ),
   ));
 }
