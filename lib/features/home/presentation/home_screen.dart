@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../adventure/application/adventure_daily_planner.dart';
 import '../../adventure/application/adventure_level_quiz_builder.dart';
 import '../../adventure/application/adventure_session_controller.dart';
 import '../../adventure/application/local_adventure_repository.dart';
@@ -94,6 +95,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const _sessionController = AdventureSessionController();
+  static const _dailyPlanner = AdventureDailyPlanner();
 
   late final HomeDashboardSnapshot _dashboard;
   late final AdventureRepository _adventureRepository;
@@ -114,8 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _adventureRepository =
-        widget.adventureRepository ?? LocalAdventureRepository();
     _answerRecordRepository =
         widget.answerRecordRepository ?? LocalAnswerRecordRepository();
     _wordLearningProgressRepository = widget.wordLearningProgressRepository ??
@@ -125,6 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _learningWordBookSelectionRepository =
         widget.learningWordBookSelectionRepository ??
             LocalLearningWordBookSelectionRepository();
+    _adventureRepository =
+        widget.adventureRepository ?? LocalAdventureRepository();
     _pronunciationPlayer =
         widget.pronunciationPlayer ?? createDefaultPronunciationPlayer();
     final referenceDate = DateTime.now();
@@ -132,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
       referenceDate: referenceDate,
     );
     _selectedChildId = _dashboard.children.first.id;
-    _adventure = _adventureRepository.loadAdventure(
+    _adventure = _loadPlannedAdventure(
       childId: _selectedChildId,
       referenceDate: referenceDate,
     );
@@ -198,8 +200,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 onComplete: () {
                   setState(() {
-                    _adventure =
-                        _sessionController.completeCurrentLevel(_adventure);
+                    _adventure = _planAdventureSnapshot(
+                      _sessionController.completeCurrentLevel(_adventure),
+                    );
                     _adventureRepository.saveAdventure(_adventure);
                     _isStudying = false;
                     _isComplete = true;
@@ -325,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeLevel = null;
       _isStudying = false;
       _isComplete = false;
-      _adventure = _adventureRepository.loadAdventure(
+      _adventure = _loadPlannedAdventure(
         childId: childId,
         referenceDate: DateTime.now(),
       );
@@ -363,7 +366,12 @@ class _HomeScreenState extends State<HomeScreen> {
             wordBookId: wordBookId,
           );
           Navigator.of(context).pop();
-          setState(() {});
+          setState(() {
+            _adventure = _loadPlannedAdventure(
+              childId: _selectedChildId,
+              referenceDate: DateTime.now(),
+            );
+          });
         },
       ),
     );
@@ -388,7 +396,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         onDataChanged: () {
           if (mounted) {
-            setState(() {});
+            setState(() {
+              _adventure = _loadPlannedAdventure(
+                childId: _selectedChildId,
+                referenceDate: DateTime.now(),
+              );
+            });
           }
         },
       ),
@@ -426,10 +439,66 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     _wordBookRepository.saveImportedWordBook(result.wordBook!);
-    setState(() {});
+    setState(() {
+      _adventure = _loadPlannedAdventure(
+        childId: _selectedChildId,
+        referenceDate: DateTime.now(),
+      );
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已导入 ${result.wordBook!.wordCount} 个单词')),
     );
+  }
+
+  AdventureDashboardSnapshot _loadPlannedAdventure({
+    required String childId,
+    required DateTime referenceDate,
+  }) {
+    final baseAdventure = _adventureRepository.loadAdventure(
+      childId: childId,
+      referenceDate: referenceDate,
+    );
+    return _planAdventureSnapshot(baseAdventure);
+  }
+
+  AdventureDashboardSnapshot _planAdventureSnapshot(
+    AdventureDashboardSnapshot baseAdventure,
+  ) {
+    return _dailyPlanner.plan(
+      snapshot: baseAdventure,
+      wordBooks: _wordBookRepository.loadWordBooks(),
+      learningProgresses: _wordLearningProgressRepository.loadProgresses(
+        childId: baseAdventure.childId,
+      ),
+      selectedWordBookId: _selectedWordBookForChild(baseAdventure.childId)?.id,
+    );
+  }
+
+  WordBook? _selectedWordBookForChild(String childId) {
+    final wordBooks = _wordBookRepository.loadWordBooks();
+    if (wordBooks.isEmpty) {
+      return null;
+    }
+
+    final savedWordBookId = _learningWordBookSelectionRepository
+        .loadSelectedWordBookId(childId: childId);
+    for (final wordBook in wordBooks) {
+      if (wordBook.id == savedWordBookId) {
+        return wordBook;
+      }
+    }
+
+    final child = _dashboard.children.firstWhere(
+      (child) => child.id == childId,
+      orElse: () => _dashboard.children.first,
+    );
+    for (final wordBook in wordBooks) {
+      if (wordBook.stageLabel == child.gradeLabel) {
+        return wordBook;
+      }
+    }
+
+    return wordBooks.first;
   }
 }
 

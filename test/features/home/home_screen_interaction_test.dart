@@ -24,7 +24,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('听音训练'), findsOneWidget);
-    expect(find.text('1 / 6'), findsOneWidget);
+    expect(find.text('1 / 3'), findsOneWidget);
     expect(find.text('听发音，选择对应单词'), findsOneWidget);
     expect(find.text('neighbor'), findsOneWidget);
     expect(find.text('library'), findsWidgets);
@@ -41,7 +41,7 @@ void main() {
     await tester.tap(find.text('下一题'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 / 6'), findsOneWidget);
+    expect(find.text('2 / 3'), findsOneWidget);
     expect(find.text('今天完成了'), findsNothing);
   });
 
@@ -65,9 +65,6 @@ void main() {
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
     await tester.pumpAndSettle();
     await _completeVisibleQuiz(tester, answers: const [
-      'through',
-      'neighbor',
-      'library',
       'through',
       'neighbor',
       'library',
@@ -97,19 +94,16 @@ void main() {
     await tester.tap(find.text('下一题'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 / 6'), findsOneWidget);
+    expect(find.text('2 / 3'), findsOneWidget);
     expect(find.text('今天完成了'), findsNothing);
 
     await _completeVisibleQuiz(tester, answers: const [
       'neighbor',
       'library',
-      'through',
-      'neighbor',
-      'library',
     ]);
 
     expect(find.text('今天完成了'), findsNothing);
-    expect(find.text('1 / 6'), findsOneWidget);
+    expect(find.text('1 / 3'), findsOneWidget);
 
     await tester.tap(find.text('through'));
     await tester.pumpAndSettle();
@@ -298,8 +292,8 @@ mountain,高山
     expect(find.text('每天一小步，单词走得稳'), findsOneWidget);
     expect(find.text('安安'), findsOneWidget);
     expect(find.text('今日任务'), findsOneWidget);
-    expect(find.text('当前关卡还剩 6 题'), findsOneWidget);
-    expect(find.text('下一组：复习探索关 · 6 题 · 选择 / 拼写 / 听音'), findsOneWidget);
+    expect(find.text('当前关卡还剩 3 题'), findsOneWidget);
+    expect(find.text('下一组：复习探索关 · 3 题 · 到期复习'), findsOneWidget);
     expect(find.text('继续学习'), findsOneWidget);
     expect(find.text('今日冒险'), findsOneWidget);
     expect(find.text('森林冒险'), findsOneWidget);
@@ -534,7 +528,7 @@ mountain,高山
     await tester.pumpAndSettle();
 
     expect(find.text('复习探索关'), findsOneWidget);
-    expect(find.text('6 题 · 选择 / 拼写 / 听音'), findsOneWidget);
+    expect(find.text('3 题 · 到期复习'), findsOneWidget);
     expect(find.text('听发音，选择对应单词'), findsOneWidget);
   });
 
@@ -548,7 +542,7 @@ mountain,高山
 
     expect(find.text('新词热身关'), findsOneWidget);
     expect(find.text('新词热身'), findsOneWidget);
-    expect(find.text('1 / 8'), findsOneWidget);
+    expect(find.text('1 / 6'), findsOneWidget);
     expect(find.text('看单词，选择中文意思'), findsOneWidget);
     expect(find.text('middle-core-3'), findsWidgets);
     expect(find.text('释义 3'), findsOneWidget);
@@ -562,7 +556,7 @@ mountain,高山
 
     expect(find.text('复习探索关'), findsOneWidget);
     expect(find.text('听音训练'), findsOneWidget);
-    expect(find.text('1 / 6'), findsOneWidget);
+    expect(find.text('1 / 3'), findsOneWidget);
     expect(find.text('听发音，选择对应单词'), findsOneWidget);
     expect(find.text('through'), findsWidgets);
   });
@@ -574,9 +568,6 @@ mountain,高山
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
     await tester.pumpAndSettle();
     await _completeVisibleQuiz(tester, answers: const [
-      'through',
-      'neighbor',
-      'library',
       'through',
       'neighbor',
       'library',
@@ -598,9 +589,6 @@ mountain,高山
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
     await tester.pumpAndSettle();
     await _completeVisibleQuiz(tester, answers: const [
-      'through',
-      'neighbor',
-      'library',
       'through',
       'neighbor',
       'library',
