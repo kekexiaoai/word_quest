@@ -366,6 +366,17 @@ mountain,高山
     await tester.tap(find.byKey(const ValueKey('data_clear_records_button')));
     await tester.pumpAndSettle();
 
+    expect(find.text('确认清空学习记录'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('confirm_cancel_button')));
+    await tester.pumpAndSettle();
+    expect(answerStorage, isNotEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('data_clear_records_button')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('confirm_clear_records_button')));
+    await tester.pumpAndSettle();
+
     expect(answerStorage, isEmpty);
 
     await tester.tap(find.byKey(const ValueKey('data_import_button')));
@@ -377,6 +388,26 @@ mountain,高山
 ''',
     );
     await tester.tap(find.byKey(const ValueKey('data_import_submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('确认导入备份'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('confirm_cancel_button')));
+    await tester.pumpAndSettle();
+    expect(importedWordBooks.single.name, '我的导入词表');
+    expect(answerStorage, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('data_import_button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('data_import_json_input')),
+      '''
+{"schemaVersion":1,"exportedAt":"2026-05-02T21:00:00.000","children":[],"wordBooks":[{"id":"restored","name":"恢复词表","stageLabel":"自定义","isBuiltIn":false,"words":[{"id":"restored-1","spelling":"river","meanings":["河流"],"tags":[]}]}],"answerRecords":[{"childId":"child-brother","wordId":"restored-1","practiceMode":"listeningChoice","isCorrect":false,"answeredAt":"2026-05-02T20:00:00.000","elapsedMilliseconds":1000,"weaknessType":"listening"}]}
+''',
+    );
+    await tester.tap(find.byKey(const ValueKey('data_import_submit')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('confirm_import_backup_button')));
     await tester.pumpAndSettle();
 
     expect(importedWordBooks.single.name, '恢复词表');

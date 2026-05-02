@@ -1521,7 +1521,17 @@ class _DataManagementDialog extends StatelessWidget {
       actions: [
         TextButton(
           key: const ValueKey('data_clear_records_button'),
-          onPressed: () {
+          onPressed: () async {
+            final confirmed = await _confirmDangerousAction(
+              context: context,
+              title: '确认清空学习记录',
+              message: '这会删除所有本地答题记录，但不会删除导入词表。清空后错词和薄弱点会重新开始累计。',
+              confirmKey: const ValueKey('confirm_clear_records_button'),
+              confirmLabel: '确认清空',
+            );
+            if (!confirmed || !context.mounted) {
+              return;
+            }
             service.clearLearningRecords();
             onDataChanged();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1559,6 +1569,20 @@ class _DataManagementDialog extends StatelessWidget {
     if (jsonText == null) {
       return;
     }
+    if (!context.mounted) {
+      return;
+    }
+
+    final confirmed = await _confirmDangerousAction(
+      context: context,
+      title: '确认导入备份',
+      message: '导入备份会覆盖当前导入词表和学习记录。建议先导出当前数据后再继续。',
+      confirmKey: const ValueKey('confirm_import_backup_button'),
+      confirmLabel: '确认导入',
+    );
+    if (!confirmed) {
+      return;
+    }
 
     try {
       service.importBackup(jsonText);
@@ -1575,6 +1599,35 @@ class _DataManagementDialog extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<bool> _confirmDangerousAction({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required Key confirmKey,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            key: const ValueKey('confirm_cancel_button'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: confirmKey,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 }
 
