@@ -27,6 +27,47 @@ void main() {
     expect(quiz.choices, contains('图书馆'));
   });
 
+  test('新词热身关优先使用导入词表生成题组', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[0],
+      wordBooks: const [
+        WordBook(
+          id: 'built-in',
+          name: '内置词表',
+          stageLabel: '内置',
+          isBuiltIn: true,
+          words: [
+            WordEntry(id: 'library', spelling: 'library', meanings: ['图书馆']),
+            WordEntry(id: 'neighbor', spelling: 'neighbor', meanings: ['邻居']),
+          ],
+        ),
+        WordBook(
+          id: 'custom',
+          name: '我的导入词表',
+          stageLabel: '自定义',
+          words: [
+            WordEntry(id: 'custom-ocean', spelling: 'ocean', meanings: ['海洋']),
+            WordEntry(id: 'custom-river', spelling: 'river', meanings: ['河流']),
+            WordEntry(
+                id: 'custom-mountain', spelling: 'mountain', meanings: ['高山']),
+          ],
+        ),
+      ],
+    );
+
+    expect(quiz.prompt, 'ocean');
+    expect(quiz.wordId, 'custom-ocean');
+    expect(quiz.correctAnswer, '海洋');
+    expect(quiz.choices, containsAll(['海洋', '河流']));
+  });
+
   test('题组会按题号更新进度和题面', () {
     const repository = InMemoryAdventureRepository();
     const builder = AdventureLevelQuizBuilder();

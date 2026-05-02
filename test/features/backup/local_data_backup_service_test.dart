@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/core/local_storage/local_key_value_store.dart';
+import 'package:word_quest/features/adventure/application/adventure_session_controller.dart';
+import 'package:word_quest/features/adventure/application/local_adventure_repository.dart';
 import 'package:word_quest/features/backup/application/local_data_backup_service.dart';
 import 'package:word_quest/features/study/application/local_answer_record_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
@@ -13,9 +15,11 @@ void main() {
     final store = MemoryLocalKeyValueStore();
     final wordBookRepository = LocalWordBookRepository(store: store);
     final answerRecordRepository = LocalAnswerRecordRepository(store: store);
+    final adventureRepository = LocalAdventureRepository(store: store);
     final service = LocalDataBackupService(
       wordBookRepository: wordBookRepository,
       answerRecordRepository: answerRecordRepository,
+      adventureRepository: adventureRepository,
     );
 
     wordBookRepository.saveImportedWordBook(
@@ -37,6 +41,17 @@ void main() {
       elapsedMilliseconds: 1200,
       weaknessType: AnswerWeaknessType.listening,
     ));
+    const controller = AdventureSessionController();
+    final adventure = adventureRepository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+    adventureRepository.saveAdventure(
+      controller.feedPetWithTodayRewards(
+        controller.completeCurrentLevel(adventure),
+        fedAt: DateTime(2026, 5, 2, 20),
+      ),
+    );
 
     final backupJson = service.exportBackup(
       exportedAt: DateTime(2026, 5, 2, 21),
@@ -46,9 +61,12 @@ void main() {
         LocalWordBookRepository(store: targetStore);
     final targetAnswerRecordRepository =
         LocalAnswerRecordRepository(store: targetStore);
+    final targetAdventureRepository =
+        LocalAdventureRepository(store: targetStore);
     final targetService = LocalDataBackupService(
       wordBookRepository: targetWordBookRepository,
       answerRecordRepository: targetAnswerRecordRepository,
+      adventureRepository: targetAdventureRepository,
     );
 
     targetService.importBackup(backupJson);
@@ -60,6 +78,12 @@ void main() {
     expect(importedWordBooks.single.name, '海洋主题词表');
     expect(targetAnswerRecordRepository.loadRecords(childId: 'child-brother'),
         hasLength(1));
+    final restoredAdventure = targetAdventureRepository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+    expect(restoredAdventure.currentLevel.title, '错词 Boss 关');
+    expect(restoredAdventure.pet.level, 3);
   });
 
   test('本地数据备份服务可以清空学习记录但保留词表', () {

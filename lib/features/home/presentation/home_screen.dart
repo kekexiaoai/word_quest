@@ -89,11 +89,13 @@ class _HomeScreenState extends State<HomeScreen> {
   late final AnswerRecordRepository _answerRecordRepository;
   late final WordBookRepository _wordBookRepository;
   late final PronunciationPlayer _pronunciationPlayer;
+  late String _selectedChildId;
   late AdventureDashboardSnapshot _adventure;
   AdventureLevel? _activeLevel;
   _HomeTab _selectedTab = _HomeTab.today;
   bool _isStudying = false;
   bool _isComplete = false;
+  bool _isParentMode = false;
 
   @override
   void initState() {
@@ -110,15 +112,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _dashboard = widget.dashboardRepository.loadDashboard(
       referenceDate: referenceDate,
     );
+    _selectedChildId = _dashboard.children.first.id;
     _adventure = _adventureRepository.loadAdventure(
-      childId: _dashboard.children.first.id,
+      childId: _selectedChildId,
       referenceDate: referenceDate,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentChild = _dashboard.children.first;
+    final currentChild = _currentChild;
 
     if (_isComplete) {
       return Scaffold(
@@ -226,6 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _HomeTab.today => _TodayTabView(
           currentChild: currentChild,
           adventure: _adventure,
+          isParentMode: _isParentMode,
           onContinue: () {
             setState(() {
               _activeLevel = _adventure.currentLevel;
@@ -249,9 +253,55 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       _HomeTab.settings => _SettingsTabView(
           currentChild: currentChild,
+          children: _dashboard.children,
+          isParentMode: _isParentMode,
+          onSwitchIdentity: _openIdentitySwitcher,
           onManageData: _openDataManagement,
         ),
     };
+  }
+
+  ChildDashboardSnapshot get _currentChild {
+    return _dashboard.children.firstWhere(
+      (child) => child.id == _selectedChildId,
+      orElse: () => _dashboard.children.first,
+    );
+  }
+
+  void _selectIdentity({
+    required String childId,
+    required bool isParentMode,
+  }) {
+    setState(() {
+      _selectedChildId = childId;
+      _isParentMode = isParentMode;
+      _activeLevel = null;
+      _isStudying = false;
+      _isComplete = false;
+      _adventure = _adventureRepository.loadAdventure(
+        childId: childId,
+        referenceDate: DateTime.now(),
+      );
+    });
+  }
+
+  Future<void> _openIdentitySwitcher() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _IdentitySwitcherDialog(
+        children: _dashboard.children,
+        selectedChildId: _selectedChildId,
+        isParentMode: _isParentMode,
+        onSelectChild: (childId) {
+          Navigator.of(context).pop();
+          _selectIdentity(childId: childId, isParentMode: false);
+        },
+        onSelectParent: () {
+          Navigator.of(context).pop();
+          _selectIdentity(childId: _selectedChildId, isParentMode: true);
+        },
+      ),
+    );
   }
 
   Future<void> _openDataManagement() async {
@@ -261,6 +311,9 @@ class _HomeScreenState extends State<HomeScreen> {
         service: LocalDataBackupService(
           wordBookRepository: _wordBookRepository,
           answerRecordRepository: _answerRecordRepository,
+          adventureRepository: _adventureRepository is LocalAdventureRepository
+              ? _adventureRepository
+              : null,
         ),
         onDataChanged: () {
           if (mounted) {
@@ -313,11 +366,13 @@ class _TodayTabView extends StatelessWidget {
   const _TodayTabView({
     required this.currentChild,
     required this.adventure,
+    required this.isParentMode,
     required this.onContinue,
   });
 
   final ChildDashboardSnapshot currentChild;
   final AdventureDashboardSnapshot adventure;
+  final bool isParentMode;
   final VoidCallback onContinue;
 
   @override
@@ -328,11 +383,11 @@ class _TodayTabView extends StatelessWidget {
         _Header(
           title: '词途',
           eyebrow: '每天一小步，单词走得稳',
-          trailing: _LearnerPill(name: currentChild.name),
+          trailing: _LearnerPill(name: isParentMode ? '家长' : currentChild.name),
         ),
         const SizedBox(height: 28),
         _TodayTaskCard(
-          child: currentChild,
+          adventure: adventure,
           onContinue: onContinue,
         ),
         const SizedBox(height: 24),
@@ -732,16 +787,27 @@ class _LearnerPill extends StatelessWidget {
 
 class _TodayTaskCard extends StatelessWidget {
   const _TodayTaskCard({
-    required this.child,
+    required this.adventure,
     required this.onContinue,
   });
 
-  final ChildDashboardSnapshot child;
+  final AdventureDashboardSnapshot adventure;
   final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
-    final progressPercent = (child.progress * 100).round();
+    final currentLevel = adventure.currentLevel;
+    final completedLevels = adventure.levels
+        .where((level) => level.status == AdventureLevelStatus.completed)
+        .length;
+    final totalLevels = adventure.levels.isEmpty ? 1 : adventure.levels.length;
+    final progress = completedLevels / totalLevels;
+    final progressPercent = (progress * 100).round();
+    final questionCount =
+        currentLevel.questionCount <= 0 ? 1 : currentLevel.questionCount;
+    final taskTitle = currentLevel.type == AdventureLevelType.chestSettlement
+        ? '准备打开今日宝箱'
+        : '当前关卡还剩 $questionCount 题';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -755,11 +821,11 @@ class _TodayTaskCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       '今日任务',
                       style: TextStyle(
                         color: Color(0xFF34C759),
@@ -767,20 +833,20 @@ class _TodayTaskCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
-                      '12 分钟完成剩余练习',
-                      style: TextStyle(
+                      taskTitle,
+                      style: const TextStyle(
                         color: Color(0xFF111114),
                         fontSize: 30,
                         height: 1.12,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
-                      '还剩 7 题，下一组是听音和错词复习。',
-                      style: TextStyle(
+                      '下一组：${currentLevel.title} · ${currentLevel.subtitle}',
+                      style: const TextStyle(
                         color: Color(0xFF70727A),
                         fontSize: 16,
                         height: 1.35,
@@ -798,7 +864,7 @@ class _TodayTaskCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: child.progress,
+              value: progress,
               minHeight: 8,
               backgroundColor: const Color(0xFFE2E2E8),
               color: const Color(0xFF2F856F),
@@ -1736,10 +1802,16 @@ class _BackupImportDialogState extends State<_BackupImportDialog> {
 class _SettingsTabView extends StatelessWidget {
   const _SettingsTabView({
     required this.currentChild,
+    required this.children,
+    required this.isParentMode,
+    required this.onSwitchIdentity,
     required this.onManageData,
   });
 
   final ChildDashboardSnapshot currentChild;
+  final List<ChildDashboardSnapshot> children;
+  final bool isParentMode;
+  final VoidCallback onSwitchIdentity;
   final VoidCallback onManageData;
 
   @override
@@ -1753,7 +1825,11 @@ class _SettingsTabView extends StatelessWidget {
           trailing: SizedBox.shrink(),
         ),
         const SizedBox(height: 28),
-        _ProfileCard(name: currentChild.name),
+        _ProfileCard(
+          name: isParentMode ? '家长模式' : currentChild.name,
+          avatar: isParentMode ? '家' : _firstCharacter(currentChild.name),
+          subtitle: isParentMode ? '家长看板' : '孩子模式 · ${currentChild.gradeLabel}',
+        ),
         const SizedBox(height: 28),
         const _SectionTitle('身份与档案'),
         const SizedBox(height: 14),
@@ -1764,7 +1840,9 @@ class _SettingsTabView extends StatelessWidget {
               iconColor: const Color(0xFF2F856F),
               iconBackground: const Color(0xFFE5F8EC),
               title: '切换孩子 / 家长',
-              subtitle: currentChild.name,
+              subtitle: isParentMode ? '家长模式' : currentChild.name,
+              onTap: onSwitchIdentity,
+              key: const ValueKey('settings_switch_identity'),
             ),
             const _RouteRow(
               icon: Icons.shield_outlined,
@@ -1840,12 +1918,72 @@ class _SettingsTabView extends StatelessWidget {
       ],
     );
   }
+
+  String _firstCharacter(String value) {
+    if (value.isEmpty) {
+      return '?';
+    }
+    return value.substring(0, 1);
+  }
+}
+
+class _IdentitySwitcherDialog extends StatelessWidget {
+  const _IdentitySwitcherDialog({
+    required this.children,
+    required this.selectedChildId,
+    required this.isParentMode,
+    required this.onSelectChild,
+    required this.onSelectParent,
+  });
+
+  final List<ChildDashboardSnapshot> children;
+  final String selectedChildId;
+  final bool isParentMode;
+  final ValueChanged<String> onSelectChild;
+  final VoidCallback onSelectParent;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('切换身份'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final child in children)
+            ListTile(
+              key: ValueKey('identity_${child.id}'),
+              leading: const Icon(Icons.face_rounded),
+              title: Text(child.name),
+              subtitle: Text(child.gradeLabel),
+              trailing: !isParentMode && child.id == selectedChildId
+                  ? const Icon(Icons.check_rounded)
+                  : null,
+              onTap: () => onSelectChild(child.id),
+            ),
+          ListTile(
+            key: const ValueKey('identity_parent'),
+            leading: const Icon(Icons.admin_panel_settings_rounded),
+            title: const Text('家长模式'),
+            subtitle: const Text('查看设置和数据管理'),
+            trailing: isParentMode ? const Icon(Icons.check_rounded) : null,
+            onTap: onSelectParent,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.name});
+  const _ProfileCard({
+    required this.name,
+    required this.avatar,
+    required this.subtitle,
+  });
 
   final String name;
+  final String avatar;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1865,9 +2003,9 @@ class _ProfileCard extends StatelessWidget {
               color: Color(0xFF2F856F),
               shape: BoxShape.circle,
             ),
-            child: const Text(
-              '安',
-              style: TextStyle(
+            child: Text(
+              avatar,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
@@ -1888,9 +2026,9 @@ class _ProfileCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  '孩子模式 · 五年级',
-                  style: TextStyle(
+                Text(
+                  subtitle,
+                  style: const TextStyle(
                     color: Color(0xFF70727A),
                     fontSize: 16,
                     fontWeight: FontWeight.w800,

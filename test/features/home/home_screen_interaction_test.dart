@@ -280,7 +280,8 @@ mountain,高山
     expect(find.text('每天一小步，单词走得稳'), findsOneWidget);
     expect(find.text('安安'), findsOneWidget);
     expect(find.text('今日任务'), findsOneWidget);
-    expect(find.text('12 分钟完成剩余练习'), findsOneWidget);
+    expect(find.text('当前关卡还剩 6 题'), findsOneWidget);
+    expect(find.text('下一组：复习探索关 · 6 题 · 选择 / 拼写 / 听音'), findsOneWidget);
     expect(find.text('继续学习'), findsOneWidget);
     expect(find.text('今日冒险'), findsOneWidget);
     expect(find.text('森林冒险'), findsOneWidget);
@@ -292,6 +293,28 @@ mountain,高山
     expect(find.text('宁宁'), findsNothing);
     expect(find.text('内置词表'), findsNothing);
     expect(find.text('家长提醒'), findsNothing);
+  });
+
+  testWidgets('设置页可以切换当前孩子和家长模式', (tester) async {
+    await _pumpHome(tester);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_switch_identity')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('identity_child-sister')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('宁宁'), findsWidgets);
+    expect(find.text('孩子模式 · 小学高年级词表'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('settings_switch_identity')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('identity_parent')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('家长模式'), findsWidgets);
+    expect(find.text('家长看板'), findsOneWidget);
   });
 
   testWidgets('底部导航可以切换到新版词表和设置页', (tester) async {
@@ -325,7 +348,7 @@ mountain,高山
 
     expect(find.text('设置'), findsWidgets);
     expect(find.text('Word Quest'), findsOneWidget);
-    expect(find.text('孩子模式 · 五年级'), findsOneWidget);
+    expect(find.text('孩子模式 · 初中词表'), findsOneWidget);
     expect(find.text('身份与档案'), findsOneWidget);
     expect(find.text('切换孩子 / 家长'), findsOneWidget);
     expect(find.text('家长管理'), findsOneWidget);

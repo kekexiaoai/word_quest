@@ -10,11 +10,13 @@ import 'in_memory_adventure_repository.dart';
 class LocalAdventureRepository implements AdventureRepository {
   LocalAdventureRepository({
     LocalKeyValueStore? store,
-    AdventureRepository fallbackRepository = const InMemoryAdventureRepository(),
+    AdventureRepository fallbackRepository =
+        const InMemoryAdventureRepository(),
   })  : _store = store ?? createDefaultLocalKeyValueStore(),
         _fallbackRepository = fallbackRepository;
 
-  static const _storagePrefix = 'word_quest.adventure_snapshots.v1';
+  static const _storageKey = 'word_quest.adventure_snapshots.v1';
+  static const _legacyStoragePrefix = 'word_quest.adventure_snapshots.v1';
 
   final LocalKeyValueStore _store;
   final AdventureRepository _fallbackRepository;
@@ -24,7 +26,17 @@ class LocalAdventureRepository implements AdventureRepository {
     required String childId,
     required DateTime referenceDate,
   }) {
-    final jsonText = _store.read(_storageKey(
+    final snapshotKey = _snapshotKey(
+      childId: childId,
+      date: _dateOnly(referenceDate),
+    );
+    final snapshots = _loadSnapshotMap();
+    final savedSnapshot = snapshots[snapshotKey];
+    if (savedSnapshot is Map<String, dynamic>) {
+      return _snapshotFromJson(savedSnapshot);
+    }
+
+    final jsonText = _store.read(_legacyStorageKey(
       childId: childId,
       date: _dateOnly(referenceDate),
     ));
@@ -58,17 +70,69 @@ class LocalAdventureRepository implements AdventureRepository {
     final date =
         snapshot.levels.isEmpty ? DateTime.now() : snapshot.levels.first.date;
     _store.write(
-      _storageKey(childId: snapshot.childId, date: date),
-      jsonEncode(_snapshotToJson(snapshot)),
+      _storageKey,
+      jsonEncode({
+        ..._loadSnapshotMap(),
+        _snapshotKey(childId: snapshot.childId, date: date):
+            _snapshotToJson(snapshot),
+      }),
     );
   }
 
-  String _storageKey({
+  List<AdventureDashboardSnapshot> loadSavedAdventures() {
+    return [
+      for (final value in _loadSnapshotMap().values)
+        if (value is Map<String, dynamic>) _snapshotFromJson(value),
+    ];
+  }
+
+  void replaceSavedAdventures(List<AdventureDashboardSnapshot> snapshots) {
+    _store.write(
+      _storageKey,
+      jsonEncode({
+        for (final snapshot in snapshots)
+          _snapshotKey(
+            childId: snapshot.childId,
+            date: snapshot.levels.isEmpty
+                ? DateTime.now()
+                : snapshot.levels.first.date,
+          ): _snapshotToJson(snapshot),
+      }),
+    );
+  }
+
+  Map<String, dynamic> _loadSnapshotMap() {
+    final jsonText = _store.read(_storageKey);
+    if (jsonText == null || jsonText.trim().isEmpty) {
+      return {};
+    }
+
+    try {
+      final decoded = jsonDecode(jsonText);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } on FormatException {
+      return {};
+    }
+    return {};
+  }
+
+  String _snapshotKey({
     required String childId,
     required DateTime date,
   }) {
     final normalizedDate = _dateOnly(date);
-    return '$_storagePrefix.$childId.${normalizedDate.year}-'
+    return '$childId-${normalizedDate.year}-${normalizedDate.month}-'
+        '${normalizedDate.day}';
+  }
+
+  String _legacyStorageKey({
+    required String childId,
+    required DateTime date,
+  }) {
+    final normalizedDate = _dateOnly(date);
+    return '$_legacyStoragePrefix.$childId.${normalizedDate.year}-'
         '${normalizedDate.month}-${normalizedDate.day}';
   }
 

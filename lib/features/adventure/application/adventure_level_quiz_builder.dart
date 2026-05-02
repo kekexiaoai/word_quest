@@ -16,7 +16,8 @@ class AdventureLevelQuizBuilder {
   }) {
     final wordCatalog = _wordCatalogFrom(wordBooks);
     return switch (level.type) {
-      AdventureLevelType.newWordWarmup => _newWordWarmup(level, questionIndex),
+      AdventureLevelType.newWordWarmup =>
+        _newWordWarmup(level, questionIndex, wordCatalog),
       AdventureLevelType.reviewExplore =>
         _reviewExplore(level, questionIndex, answerRecords, wordCatalog),
       AdventureLevelType.mistakeBoss =>
@@ -26,7 +27,35 @@ class AdventureLevelQuizBuilder {
     };
   }
 
-  AdventureLevelQuiz _newWordWarmup(AdventureLevel level, int questionIndex) {
+  AdventureLevelQuiz _newWordWarmup(
+    AdventureLevel level,
+    int questionIndex,
+    List<_KnownWord> wordCatalog,
+  ) {
+    final newWords = [
+      for (final word in wordCatalog)
+        if (!word.isBuiltIn) word,
+      if (!wordCatalog.any((word) => !word.isBuiltIn)) ...wordCatalog,
+    ];
+
+    if (newWords.isNotEmpty) {
+      final word = _seedAt(newWords, questionIndex);
+      return AdventureLevelQuiz(
+        activityTitle: '新词热身',
+        progressLabel: _progressLabel(level, questionIndex),
+        progressValue: _progressValue(level, questionIndex),
+        instruction: '看单词，选择中文意思',
+        wordId: word.id,
+        practiceMode: PracticeMode.englishToChinese,
+        prompt: word.spelling,
+        correctAnswer: word.meaning,
+        choices: _meaningChoices(word, wordCatalog),
+        successTitle: '热身成功',
+        explanation: '${word.spelling} 表示${word.meaning}，先赢一次很重要。',
+        usesAudioPrompt: false,
+      );
+    }
+
     final seed = _seedAt(
       const [
         _QuizSeed(prompt: 'library', correctAnswer: '图书馆'),
@@ -278,7 +307,7 @@ class AdventureLevelQuizBuilder {
 
     for (final wordBook in wordBooks) {
       for (final word in wordBook.words) {
-        final knownWord = _KnownWord.fromEntry(wordBook.id, word);
+        final knownWord = _KnownWord.fromEntry(wordBook, word);
         if (knownWord == null || !seenIds.add(knownWord.id)) {
           continue;
         }
@@ -409,23 +438,26 @@ class _KnownWord {
   const _KnownWord({
     required this.id,
     required this.wordBookId,
+    required this.isBuiltIn,
     required this.spelling,
     required this.meaning,
   });
 
   final String id;
   final String wordBookId;
+  final bool isBuiltIn;
   final String spelling;
   final String meaning;
 
-  static _KnownWord? fromEntry(String wordBookId, WordEntry entry) {
+  static _KnownWord? fromEntry(WordBook wordBook, WordEntry entry) {
     if (entry.meanings.isEmpty) {
       return null;
     }
 
     return _KnownWord(
       id: entry.id,
-      wordBookId: wordBookId,
+      wordBookId: wordBook.id,
+      isBuiltIn: wordBook.isBuiltIn,
       spelling: entry.spelling,
       meaning: entry.meanings.first,
     );

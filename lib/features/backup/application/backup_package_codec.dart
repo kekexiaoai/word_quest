@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../../adventure/domain/adventure_dashboard_snapshot.dart';
+import '../../adventure/domain/adventure_level.dart';
+import '../../adventure/domain/pet_profile.dart';
 import '../../child_profile/domain/child_profile.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
@@ -57,6 +60,10 @@ class BackupPackageCodec {
         for (final item in _optionalList(decoded, 'answerRecords'))
           _answerRecordFromJson(_asMap(item, 'answerRecords')),
       ],
+      adventureSnapshots: [
+        for (final item in _optionalList(decoded, 'adventureSnapshots'))
+          _adventureSnapshotFromJson(_asMap(item, 'adventureSnapshots')),
+      ],
     );
   }
 
@@ -72,6 +79,10 @@ class BackupPackageCodec {
       ],
       'answerRecords': [
         for (final record in package.answerRecords) _answerRecordToJson(record),
+      ],
+      'adventureSnapshots': [
+        for (final snapshot in package.adventureSnapshots)
+          _adventureSnapshotToJson(snapshot),
       ],
     };
   }
@@ -176,6 +187,123 @@ class BackupPackageCodec {
     );
   }
 
+  Map<String, Object?> _adventureSnapshotToJson(
+    AdventureDashboardSnapshot snapshot,
+  ) {
+    return {
+      'childId': snapshot.childId,
+      'themeTitle': snapshot.themeTitle,
+      'currentNodeTitle': snapshot.currentNodeTitle,
+      'starsEarned': snapshot.starsEarned,
+      'starsTarget': snapshot.starsTarget,
+      'chestProgress': snapshot.chestProgress,
+      'levels': [
+        for (final level in snapshot.levels) _adventureLevelToJson(level),
+      ],
+      'pet': _petToJson(snapshot.pet),
+    };
+  }
+
+  AdventureDashboardSnapshot _adventureSnapshotFromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AdventureDashboardSnapshot(
+      childId: _requiredString(json, 'childId'),
+      themeTitle: _requiredString(json, 'themeTitle'),
+      currentNodeTitle: _requiredString(json, 'currentNodeTitle'),
+      starsEarned: _requiredInt(json, 'starsEarned'),
+      starsTarget: _requiredInt(json, 'starsTarget'),
+      chestProgress: _requiredDouble(json, 'chestProgress'),
+      levels: [
+        for (final item in _requiredList(json, 'levels'))
+          _adventureLevelFromJson(_asMap(item, 'levels')),
+      ],
+      pet: _petFromJson(_asMap(json['pet'], 'pet')),
+    );
+  }
+
+  Map<String, Object?> _adventureLevelToJson(AdventureLevel level) {
+    return {
+      'id': level.id,
+      'childId': level.childId,
+      'date': level.date.toIso8601String(),
+      'type': level.type.name,
+      'title': level.title,
+      'subtitle': level.subtitle,
+      'status': level.status.name,
+      'questionCount': level.questionCount,
+      'reward': _adventureRewardToJson(level.reward),
+    };
+  }
+
+  AdventureLevel _adventureLevelFromJson(Map<String, dynamic> json) {
+    return AdventureLevel(
+      id: _requiredString(json, 'id'),
+      childId: _requiredString(json, 'childId'),
+      date: _requiredDateTime(json, 'date'),
+      type: _adventureLevelTypeFromName(_requiredString(json, 'type')),
+      title: _requiredString(json, 'title'),
+      subtitle: _requiredString(json, 'subtitle'),
+      status: _adventureLevelStatusFromName(_requiredString(json, 'status')),
+      questionCount: _requiredInt(json, 'questionCount'),
+      reward: _adventureRewardFromJson(_asMap(json['reward'], 'reward')),
+    );
+  }
+
+  Map<String, Object?> _adventureRewardToJson(AdventureReward reward) {
+    return {
+      'stars': reward.stars,
+      'foodName': reward.foodName,
+      'foodCount': reward.foodCount,
+      'energy': reward.energy,
+      'growthPoints': reward.growthPoints,
+      'chestProgress': reward.chestProgress,
+    };
+  }
+
+  AdventureReward _adventureRewardFromJson(Map<String, dynamic> json) {
+    return AdventureReward(
+      stars: _optionalInt(json, 'stars') ?? 0,
+      foodName: _optionalString(json, 'foodName'),
+      foodCount: _optionalInt(json, 'foodCount') ?? 0,
+      energy: _optionalInt(json, 'energy') ?? 0,
+      growthPoints: _optionalInt(json, 'growthPoints') ?? 0,
+      chestProgress: _optionalInt(json, 'chestProgress') ?? 0,
+    );
+  }
+
+  Map<String, Object?> _petToJson(PetProfile pet) {
+    return {
+      'childId': pet.childId,
+      'petId': pet.petId,
+      'name': pet.name,
+      'level': pet.level,
+      'growthPoints': pet.growthPoints,
+      'growthTarget': pet.growthTarget,
+      'satiety': pet.satiety,
+      'mood': pet.mood.name,
+      'equippedDecorationIds': pet.equippedDecorationIds,
+      'unlockedDecorationIds': pet.unlockedDecorationIds,
+      'lastFedAt': pet.lastFedAt?.toIso8601String(),
+    };
+  }
+
+  PetProfile _petFromJson(Map<String, dynamic> json) {
+    return PetProfile(
+      childId: _requiredString(json, 'childId'),
+      petId: _requiredString(json, 'petId'),
+      name: _requiredString(json, 'name'),
+      level: _requiredInt(json, 'level'),
+      growthPoints: _requiredInt(json, 'growthPoints'),
+      growthTarget: _requiredInt(json, 'growthTarget'),
+      satiety: _requiredInt(json, 'satiety'),
+      mood: _petMoodFromName(_requiredString(json, 'mood')),
+      equippedDecorationIds: _requiredStringList(json, 'equippedDecorationIds'),
+      unlockedDecorationIds: _requiredStringList(json, 'unlockedDecorationIds'),
+      lastFedAt: _optionalDateTime(json, 'lastFedAt'),
+    );
+  }
+
   String _requiredString(Map<String, dynamic> json, String field) {
     final value = json[field];
     if (value is String && value.trim().isNotEmpty) {
@@ -201,6 +329,25 @@ class BackupPackageCodec {
       return value;
     }
     throw BackupPackageFormatException('字段 $field 必须是整数');
+  }
+
+  int? _optionalInt(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    throw BackupPackageFormatException('字段 $field 必须是整数');
+  }
+
+  double _requiredDouble(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value is num) {
+      return value.toDouble();
+    }
+    throw BackupPackageFormatException('字段 $field 必须是数字');
   }
 
   bool? _optionalBool(Map<String, dynamic> json, String field) {
@@ -313,5 +460,32 @@ class BackupPackageCodec {
       }
     }
     throw BackupPackageFormatException('字段 weaknessType 不支持：$name');
+  }
+
+  AdventureLevelType _adventureLevelTypeFromName(String name) {
+    for (final type in AdventureLevelType.values) {
+      if (type.name == name) {
+        return type;
+      }
+    }
+    throw BackupPackageFormatException('未知冒险关卡类型：$name');
+  }
+
+  AdventureLevelStatus _adventureLevelStatusFromName(String name) {
+    for (final status in AdventureLevelStatus.values) {
+      if (status.name == name) {
+        return status;
+      }
+    }
+    throw BackupPackageFormatException('未知冒险关卡状态：$name');
+  }
+
+  PetMood _petMoodFromName(String name) {
+    for (final mood in PetMood.values) {
+      if (mood.name == name) {
+        return mood;
+      }
+    }
+    throw BackupPackageFormatException('未知宠物状态：$name');
   }
 }
