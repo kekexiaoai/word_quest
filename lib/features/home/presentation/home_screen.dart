@@ -1423,12 +1423,19 @@ class _StudyQuizScreen extends StatefulWidget {
 }
 
 class _StudyQuizScreenState extends State<_StudyQuizScreen> {
+  int _questionIndex = 0;
   String? _selectedAnswer;
   bool _showFeedback = false;
 
   @override
   Widget build(BuildContext context) {
-    final quiz = const AdventureLevelQuizBuilder().buildForLevel(widget.level);
+    final quiz = const AdventureLevelQuizBuilder().buildForLevel(
+      widget.level,
+      questionIndex: _questionIndex,
+    );
+    final questionCount =
+        widget.level.questionCount <= 0 ? 1 : widget.level.questionCount;
+    final isLastQuestion = _questionIndex >= questionCount - 1;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
@@ -1545,7 +1552,20 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
         SizedBox(
           height: 58,
           child: FilledButton(
-            onPressed: _showFeedback ? widget.onComplete : null,
+            onPressed: _showFeedback
+                ? () {
+                    if (isLastQuestion) {
+                      widget.onComplete();
+                      return;
+                    }
+
+                    setState(() {
+                      _questionIndex += 1;
+                      _selectedAnswer = null;
+                      _showFeedback = false;
+                    });
+                  }
+                : null,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2F856F),
               disabledBackgroundColor: const Color(0xFFA8D4C6),

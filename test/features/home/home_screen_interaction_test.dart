@@ -30,6 +30,25 @@ void main() {
     await tester.tap(find.text('下一题'));
     await tester.pumpAndSettle();
 
+    expect(find.text('2 / 6'), findsOneWidget);
+    expect(find.text('今天完成了'), findsNothing);
+  });
+
+  testWidgets('答完当前关卡最后一题后才进入结算', (tester) async {
+    await _pumpHome(tester);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await _completeVisibleQuiz(tester, answers: const [
+      'through',
+      'neighbor',
+      'library',
+      'through',
+      'neighbor',
+      'library',
+    ]);
+
     expect(find.text('今天完成了'), findsOneWidget);
     expect(find.text('安安获得 3 颗星，森林书屋第 4 站已点亮。'), findsOneWidget);
     expect(find.text('普通食物 +1'), findsOneWidget);
@@ -150,12 +169,14 @@ void main() {
     await tester
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('through'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一题'));
-    await tester.pumpAndSettle();
+    await _completeVisibleQuiz(tester, answers: const [
+      'through',
+      'neighbor',
+      'library',
+      'through',
+      'neighbor',
+      'library',
+    ]);
     await tester.tap(find.text('喂食豆豆'));
     await tester.pumpAndSettle();
 
@@ -172,12 +193,14 @@ void main() {
     await tester
         .tap(find.byKey(const ValueKey('home_continue_learning_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('through'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('下一题'));
-    await tester.pumpAndSettle();
+    await _completeVisibleQuiz(tester, answers: const [
+      'through',
+      'neighbor',
+      'library',
+      'through',
+      'neighbor',
+      'library',
+    ]);
     await tester.tap(find.text('喂食豆豆'));
     await tester.pumpAndSettle();
 
@@ -219,6 +242,22 @@ void main() {
     expect(scaffold.extendBody, isTrue);
     expect(bodySafeArea.bottom, isFalse);
   });
+}
+
+Future<void> _completeVisibleQuiz(
+  WidgetTester tester, {
+  required List<String> answers,
+}) async {
+  for (final answer in answers) {
+    await tester.ensureVisible(find.text(answer, skipOffstage: false).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(answer).last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> _pumpHome(

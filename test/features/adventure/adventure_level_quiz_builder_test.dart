@@ -21,6 +21,28 @@ void main() {
     expect(quiz.choices, contains('图书馆'));
   });
 
+  test('题组会按题号更新进度和题面', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final firstQuiz = builder.buildForLevel(adventure.levels[1]);
+    final secondQuiz = builder.buildForLevel(
+      adventure.levels[1],
+      questionIndex: 1,
+    );
+
+    expect(firstQuiz.progressLabel, '1 / 6');
+    expect(firstQuiz.correctAnswer, 'through');
+    expect(secondQuiz.progressLabel, '2 / 6');
+    expect(secondQuiz.progressValue, closeTo(2 / 6, 0.001));
+    expect(secondQuiz.correctAnswer, 'neighbor');
+    expect(secondQuiz.choices, contains('neighbor'));
+  });
+
   test('复习探索关生成听音选词题组', () {
     const repository = InMemoryAdventureRepository();
     const builder = AdventureLevelQuizBuilder();
