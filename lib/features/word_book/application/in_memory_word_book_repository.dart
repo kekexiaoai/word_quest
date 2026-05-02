@@ -3,7 +3,19 @@ import '../domain/word_book_repository.dart';
 import '../domain/word_entry.dart';
 
 class InMemoryWordBookRepository implements WordBookRepository {
-  const InMemoryWordBookRepository();
+  const InMemoryWordBookRepository({
+    this.importedWordBooks = const [],
+  });
+
+  final List<WordBook> importedWordBooks;
+
+  @override
+  List<WordBook> loadWordBooks() {
+    return [
+      ...loadBuiltInWordBooks(),
+      ...importedWordBooks,
+    ];
+  }
 
   @override
   List<WordBook> loadBuiltInWordBooks() {
@@ -33,13 +45,26 @@ class InMemoryWordBookRepository implements WordBookRepository {
   }
 
   List<WordEntry> _words(String prefix, int count) {
-    return List.generate(
-      count,
-      (index) => WordEntry(
-        id: '$prefix-$index',
-        spelling: '$prefix-$index',
-        meanings: ['释义 $index'],
-      ),
+    const demoWords = [
+      WordEntry(id: 'library', spelling: 'library', meanings: ['图书馆']),
+      WordEntry(id: 'neighbor', spelling: 'neighbor', meanings: ['邻居']),
+      WordEntry(id: 'through', spelling: 'through', meanings: ['穿过']),
+    ];
+    final generatedWords = List.generate(
+      count - demoWords.length,
+      (index) {
+        final displayIndex = index + demoWords.length;
+        return WordEntry(
+          id: '$prefix-$displayIndex',
+          spelling: '$prefix-$displayIndex',
+          meanings: ['释义 $displayIndex'],
+        );
+      },
     );
+
+    return [
+      ...demoWords,
+      ...generatedWords,
+    ];
   }
 }

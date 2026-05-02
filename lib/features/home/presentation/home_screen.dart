@@ -16,6 +16,9 @@ import '../../study/application/study_answer_evaluator.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
+import '../../word_book/application/in_memory_word_book_repository.dart';
+import '../../word_book/domain/word_book.dart';
+import '../../word_book/domain/word_book_repository.dart';
 
 enum _HomeTab {
   today,
@@ -59,11 +62,13 @@ class HomeScreen extends StatefulWidget {
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
     this.adventureRepository = const InMemoryAdventureRepository(),
     this.answerRecordRepository = const InMemoryAnswerRecordRepository(),
+    this.wordBookRepository = const InMemoryWordBookRepository(),
   });
 
   final HomeDashboardRepository dashboardRepository;
   final AdventureRepository adventureRepository;
   final AnswerRecordRepository answerRecordRepository;
+  final WordBookRepository wordBookRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -141,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 childId: currentChild.id,
                 level: _activeLevel ?? _adventure.currentLevel,
                 answerRecordRepository: widget.answerRecordRepository,
+                wordBooks: widget.wordBookRepository.loadWordBooks(),
                 onClose: () {
                   setState(() {
                     _isStudying = false;
@@ -1421,6 +1427,7 @@ class _StudyQuizScreen extends StatefulWidget {
     required this.childId,
     required this.level,
     required this.answerRecordRepository,
+    required this.wordBooks,
     required this.onClose,
     required this.onComplete,
   });
@@ -1428,6 +1435,7 @@ class _StudyQuizScreen extends StatefulWidget {
   final String childId;
   final AdventureLevel level;
   final AnswerRecordRepository answerRecordRepository;
+  final List<WordBook> wordBooks;
   final VoidCallback onClose;
   final VoidCallback onComplete;
 
@@ -1462,6 +1470,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
     final quiz = const AdventureLevelQuizBuilder().buildForLevel(
       widget.level,
       questionIndex: questionIndex,
+      wordBooks: widget.wordBooks,
       answerRecords: _answerRecordsSnapshot,
     );
     final isAnswerCorrect = _selectedAnswer == quiz.correctAnswer;

@@ -6,6 +6,9 @@ import 'package:word_quest/features/home/presentation/home_screen.dart';
 import 'package:word_quest/features/study/application/in_memory_answer_record_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/word_book/application/in_memory_word_book_repository.dart';
+import 'package:word_quest/features/word_book/domain/word_book.dart';
+import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
 void main() {
   testWidgets('点击继续学习进入做题页', (tester) async {
@@ -154,6 +157,48 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('薄弱点修复'), findsOneWidget);
+  });
+
+  testWidgets('导入词表中的错词会进入首页动态复习', (tester) async {
+    final recordRepository = InMemoryAnswerRecordRepository(storage: [
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'custom-ocean',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+    ]);
+    const wordBookRepository = InMemoryWordBookRepository(
+      importedWordBooks: [
+        WordBook(
+          id: 'custom',
+          name: '我的导入词表',
+          stageLabel: '自定义',
+          words: [
+            WordEntry(id: 'custom-ocean', spelling: 'ocean', meanings: ['海洋']),
+            WordEntry(id: 'custom-river', spelling: 'river', meanings: ['河流']),
+            WordEntry(
+                id: 'custom-mountain', spelling: 'mountain', meanings: ['高山']),
+          ],
+        ),
+      ],
+    );
+    await _pumpHome(
+      tester,
+      answerRecordRepository: recordRepository,
+      wordBookRepository: wordBookRepository,
+    );
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('薄弱点复习'), findsOneWidget);
+    expect(find.text('ocean'), findsWidgets);
+    expect(find.text('river'), findsOneWidget);
   });
 
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
@@ -364,6 +409,7 @@ Future<void> _pumpHome(
   WidgetTester tester, {
   InMemoryAdventureRepository? adventureRepository,
   InMemoryAnswerRecordRepository? answerRecordRepository,
+  InMemoryWordBookRepository? wordBookRepository,
 }) async {
   tester.view.physicalSize = const Size(430, 932);
   tester.view.devicePixelRatio = 1;
@@ -378,6 +424,8 @@ Future<void> _pumpHome(
           adventureRepository ?? InMemoryAdventureRepository(storage: storage),
       answerRecordRepository: answerRecordRepository ??
           InMemoryAnswerRecordRepository(storage: answerStorage),
+      wordBookRepository:
+          wordBookRepository ?? const InMemoryWordBookRepository(),
     ),
   ));
 }

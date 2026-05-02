@@ -2,6 +2,8 @@ import '../domain/adventure_level.dart';
 import '../domain/adventure_level_quiz.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
+import '../../word_book/domain/word_book.dart';
+import '../../word_book/domain/word_entry.dart';
 
 class AdventureLevelQuizBuilder {
   const AdventureLevelQuizBuilder();
@@ -9,14 +11,16 @@ class AdventureLevelQuizBuilder {
   AdventureLevelQuiz buildForLevel(
     AdventureLevel level, {
     int questionIndex = 0,
+    List<WordBook> wordBooks = const [],
     List<AnswerRecord> answerRecords = const [],
   }) {
+    final wordCatalog = _wordCatalogFrom(wordBooks);
     return switch (level.type) {
       AdventureLevelType.newWordWarmup => _newWordWarmup(level, questionIndex),
       AdventureLevelType.reviewExplore =>
-        _reviewExplore(level, questionIndex, answerRecords),
+        _reviewExplore(level, questionIndex, answerRecords, wordCatalog),
       AdventureLevelType.mistakeBoss =>
-        _mistakeBoss(level, questionIndex, answerRecords),
+        _mistakeBoss(level, questionIndex, answerRecords, wordCatalog),
       AdventureLevelType.chestSettlement =>
         _chestSettlement(level, questionIndex),
     };
@@ -52,8 +56,13 @@ class AdventureLevelQuizBuilder {
     AdventureLevel level,
     int questionIndex,
     List<AnswerRecord> answerRecords,
+    List<_KnownWord> wordCatalog,
   ) {
-    final weaknessSeeds = _weaknessReviewSeeds(level, answerRecords);
+    final weaknessSeeds = _weaknessReviewSeeds(
+      level,
+      answerRecords,
+      wordCatalog,
+    );
     if (weaknessSeeds.isNotEmpty) {
       final seed = _seedAt(weaknessSeeds, questionIndex);
       return _weaknessReviewQuiz(level, questionIndex, seed);
@@ -100,8 +109,9 @@ class AdventureLevelQuizBuilder {
     AdventureLevel level,
     int questionIndex,
     List<AnswerRecord> answerRecords,
+    List<_KnownWord> wordCatalog,
   ) {
-    final mistakeSeeds = _mistakeSeeds(level, answerRecords);
+    final mistakeSeeds = _mistakeSeeds(level, answerRecords, wordCatalog);
     if (mistakeSeeds.isNotEmpty) {
       final word = _seedAt(mistakeSeeds, questionIndex);
       return AdventureLevelQuiz(
@@ -113,7 +123,7 @@ class AdventureLevelQuizBuilder {
         practiceMode: PracticeMode.englishToChinese,
         prompt: word.spelling,
         correctAnswer: word.meaning,
-        choices: _meaningChoices(word),
+        choices: _meaningChoices(word, wordCatalog),
         successTitle: '收服成功',
         explanation: '${word.spelling} 是最近答错过的词，这次收服后会降低它的迷雾值。',
         usesAudioPrompt: false,
@@ -160,7 +170,7 @@ class AdventureLevelQuizBuilder {
       practiceMode: seed.practiceMode,
       prompt: _promptFor(word, seed.practiceMode),
       correctAnswer: _correctAnswerFor(word, seed.practiceMode),
-      choices: _choicesFor(word, seed.practiceMode),
+      choices: _choicesFor(word, seed.practiceMode, seed.wordCatalog),
       successTitle: '薄弱点修复',
       explanation: _explanationFor(word, seed.weaknessType),
       usesAudioPrompt: seed.practiceMode == PracticeMode.listeningChoice,
@@ -203,6 +213,7 @@ class AdventureLevelQuizBuilder {
   List<_WeaknessReviewSeed> _weaknessReviewSeeds(
     AdventureLevel level,
     List<AnswerRecord> answerRecords,
+    List<_KnownWord> wordCatalog,
   ) {
     final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
     final seenWordIds = <String>{};
@@ -210,7 +221,7 @@ class AdventureLevelQuizBuilder {
 
     for (final record in sortedRecords) {
       final weaknessType = record.weaknessType;
-      final word = _knownWordById(record.wordId);
+      final word = _knownWordById(record.wordId, wordCatalog);
       if (weaknessType == null || word == null || !seenWordIds.add(word.id)) {
         continue;
       }
@@ -220,6 +231,7 @@ class AdventureLevelQuizBuilder {
           word: word,
           weaknessType: weaknessType,
           practiceMode: _practiceModeFor(weaknessType),
+          wordCatalog: wordCatalog,
         ),
       );
     }
@@ -230,13 +242,14 @@ class AdventureLevelQuizBuilder {
   List<_KnownWord> _mistakeSeeds(
     AdventureLevel level,
     List<AnswerRecord> answerRecords,
+    List<_KnownWord> wordCatalog,
   ) {
     final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
     final seenWordIds = <String>{};
     final words = <_KnownWord>[];
 
     for (final record in sortedRecords) {
-      final word = _knownWordById(record.wordId);
+      final word = _knownWordById(record.wordId, wordCatalog);
       if (word == null || !seenWordIds.add(word.id)) {
         continue;
       }
@@ -259,8 +272,25 @@ class AdventureLevelQuizBuilder {
     return records;
   }
 
-  _KnownWord? _knownWordById(String id) {
-    for (final word in _knownWords) {
+  List<_KnownWord> _wordCatalogFrom(List<WordBook> wordBooks) {
+    final words = <_KnownWord>[];
+    final seenIds = <String>{};
+
+    for (final wordBook in wordBooks) {
+      for (final word in wordBook.words) {
+        final knownWord = _KnownWord.fromEntry(wordBook.id, word);
+        if (knownWord == null || !seenIds.add(knownWord.id)) {
+          continue;
+        }
+        words.add(knownWord);
+      }
+    }
+
+    return words;
+  }
+
+  _KnownWord? _knownWordById(String id, List<_KnownWord> wordCatalog) {
+    for (final word in wordCatalog) {
       if (word.id == id) {
         return word;
       }
@@ -309,31 +339,47 @@ class AdventureLevelQuizBuilder {
     };
   }
 
-  List<String> _choicesFor(_KnownWord word, PracticeMode practiceMode) {
+  List<String> _choicesFor(
+    _KnownWord word,
+    PracticeMode practiceMode,
+    List<_KnownWord> wordCatalog,
+  ) {
     return switch (practiceMode) {
-      PracticeMode.englishToChinese => _meaningChoices(word),
+      PracticeMode.englishToChinese => _meaningChoices(word, wordCatalog),
       PracticeMode.chineseToEnglish ||
       PracticeMode.spelling ||
       PracticeMode.listeningChoice ||
       PracticeMode.listeningSpelling =>
-        _spellingChoices(word),
+        _spellingChoices(word, wordCatalog),
     };
   }
 
-  List<String> _meaningChoices(_KnownWord word) {
+  List<String> _meaningChoices(_KnownWord word, List<_KnownWord> wordCatalog) {
     return [
       word.meaning,
-      for (final candidate in _knownWords)
+      for (final candidate in _choiceCandidates(word, wordCatalog))
         if (candidate.id != word.id) candidate.meaning,
     ].take(3).toList();
   }
 
-  List<String> _spellingChoices(_KnownWord word) {
+  List<String> _spellingChoices(_KnownWord word, List<_KnownWord> wordCatalog) {
     return [
       word.spelling,
-      for (final candidate in _knownWords)
+      for (final candidate in _choiceCandidates(word, wordCatalog))
         if (candidate.id != word.id) candidate.spelling,
     ].take(3).toList();
+  }
+
+  List<_KnownWord> _choiceCandidates(
+    _KnownWord word,
+    List<_KnownWord> wordCatalog,
+  ) {
+    return [
+      for (final candidate in wordCatalog)
+        if (candidate.wordBookId == word.wordBookId) candidate,
+      for (final candidate in wordCatalog)
+        if (candidate.wordBookId != word.wordBookId) candidate,
+    ];
   }
 
   String _explanationFor(_KnownWord word, AnswerWeaknessType weaknessType) {
@@ -346,12 +392,6 @@ class AdventureLevelQuizBuilder {
     };
   }
 }
-
-const _knownWords = [
-  _KnownWord(id: 'library', spelling: 'library', meaning: '图书馆'),
-  _KnownWord(id: 'neighbor', spelling: 'neighbor', meaning: '邻居'),
-  _KnownWord(id: 'through', spelling: 'through', meaning: '穿过'),
-];
 
 class _QuizSeed {
   const _QuizSeed({
@@ -368,13 +408,28 @@ class _QuizSeed {
 class _KnownWord {
   const _KnownWord({
     required this.id,
+    required this.wordBookId,
     required this.spelling,
     required this.meaning,
   });
 
   final String id;
+  final String wordBookId;
   final String spelling;
   final String meaning;
+
+  static _KnownWord? fromEntry(String wordBookId, WordEntry entry) {
+    if (entry.meanings.isEmpty) {
+      return null;
+    }
+
+    return _KnownWord(
+      id: entry.id,
+      wordBookId: wordBookId,
+      spelling: entry.spelling,
+      meaning: entry.meanings.first,
+    );
+  }
 }
 
 class _WeaknessReviewSeed {
@@ -382,9 +437,11 @@ class _WeaknessReviewSeed {
     required this.word,
     required this.weaknessType,
     required this.practiceMode,
+    required this.wordCatalog,
   });
 
   final _KnownWord word;
   final AnswerWeaknessType weaknessType;
   final PracticeMode practiceMode;
+  final List<_KnownWord> wordCatalog;
 }

@@ -3,6 +3,8 @@ import 'package:word_quest/features/adventure/application/adventure_level_quiz_b
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
+import 'package:word_quest/features/word_book/domain/word_book.dart';
+import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
 void main() {
   test('新词热身关生成看词选义题组', () {
@@ -77,6 +79,7 @@ void main() {
 
     final quiz = builder.buildForLevel(
       adventure.levels[1],
+      wordBooks: _wordBooks,
       answerRecords: [
         AnswerRecord(
           childId: 'child-brother',
@@ -126,6 +129,7 @@ void main() {
 
     final quiz = builder.buildForLevel(
       adventure.levels[2],
+      wordBooks: _wordBooks,
       answerRecords: [
         AnswerRecord(
           childId: 'child-sister',
@@ -154,4 +158,59 @@ void main() {
     expect(quiz.correctAnswer, '邻居');
     expect(quiz.choices, contains('邻居'));
   });
+
+  test('导入词表中的错词可以进入错词 Boss', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[2],
+      wordBooks: const [
+        WordBook(
+          id: 'custom',
+          name: '我的导入词表',
+          stageLabel: '自定义',
+          words: [
+            WordEntry(id: 'custom-ocean', spelling: 'ocean', meanings: ['海洋']),
+            WordEntry(id: 'custom-river', spelling: 'river', meanings: ['河流']),
+            WordEntry(
+                id: 'custom-mountain', spelling: 'mountain', meanings: ['高山']),
+          ],
+        ),
+      ],
+      answerRecords: [
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'custom-ocean',
+          practiceMode: PracticeMode.englishToChinese,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 9),
+          elapsedMilliseconds: 900,
+          weaknessType: AnswerWeaknessType.meaning,
+        ),
+      ],
+    );
+
+    expect(quiz.prompt, 'ocean');
+    expect(quiz.wordId, 'custom-ocean');
+    expect(quiz.correctAnswer, '海洋');
+    expect(quiz.choices, contains('河流'));
+  });
 }
+
+const _wordBooks = [
+  WordBook(
+    id: 'primary',
+    name: '小学词表',
+    stageLabel: '小学',
+    words: [
+      WordEntry(id: 'library', spelling: 'library', meanings: ['图书馆']),
+      WordEntry(id: 'neighbor', spelling: 'neighbor', meanings: ['邻居']),
+      WordEntry(id: 'through', spelling: 'through', meanings: ['穿过']),
+    ],
+  ),
+];
