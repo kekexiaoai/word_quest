@@ -11,13 +11,13 @@ import '../../adventure/domain/pet_profile.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
-import '../../study/application/in_memory_answer_record_repository.dart';
+import '../../study/application/local_answer_record_repository.dart';
 import '../../study/application/study_answer_evaluator.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
 import '../../word_book/application/csv_word_book_importer.dart';
-import '../../word_book/application/in_memory_word_book_repository.dart';
+import '../../word_book/application/local_word_book_repository.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_book_repository.dart';
 
@@ -62,14 +62,14 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
     this.adventureRepository = const InMemoryAdventureRepository(),
-    this.answerRecordRepository = const InMemoryAnswerRecordRepository(),
-    this.wordBookRepository = const InMemoryWordBookRepository(),
+    this.answerRecordRepository,
+    this.wordBookRepository,
   });
 
   final HomeDashboardRepository dashboardRepository;
   final AdventureRepository adventureRepository;
-  final AnswerRecordRepository answerRecordRepository;
-  final WordBookRepository wordBookRepository;
+  final AnswerRecordRepository? answerRecordRepository;
+  final WordBookRepository? wordBookRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -79,6 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _sessionController = AdventureSessionController();
 
   late final HomeDashboardSnapshot _dashboard;
+  late final AnswerRecordRepository _answerRecordRepository;
+  late final WordBookRepository _wordBookRepository;
   late AdventureDashboardSnapshot _adventure;
   AdventureLevel? _activeLevel;
   _HomeTab _selectedTab = _HomeTab.today;
@@ -88,6 +90,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _answerRecordRepository =
+        widget.answerRecordRepository ?? LocalAnswerRecordRepository();
+    _wordBookRepository =
+        widget.wordBookRepository ?? LocalWordBookRepository();
     final referenceDate = DateTime.now();
     _dashboard = widget.dashboardRepository.loadDashboard(
       referenceDate: referenceDate,
@@ -146,8 +152,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _StudyQuizScreen(
                 childId: currentChild.id,
                 level: _activeLevel ?? _adventure.currentLevel,
-                answerRecordRepository: widget.answerRecordRepository,
-                wordBooks: widget.wordBookRepository.loadWordBooks(),
+                answerRecordRepository: _answerRecordRepository,
+                wordBooks: _wordBookRepository.loadWordBooks(),
                 onClose: () {
                   setState(() {
                     _isStudying = false;
@@ -225,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       _HomeTab.wordBook => _WordBookTabView(
-          wordBooks: widget.wordBookRepository.loadWordBooks(),
+          wordBooks: _wordBookRepository.loadWordBooks(),
           onImportCsv: _importWordBookFromCsv,
         ),
       _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
@@ -241,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final importedCount = widget.wordBookRepository
+    final importedCount = _wordBookRepository
         .loadWordBooks()
         .where((wordBook) => !wordBook.isBuiltIn)
         .length;
@@ -262,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    widget.wordBookRepository.saveImportedWordBook(result.wordBook!);
+    _wordBookRepository.saveImportedWordBook(result.wordBook!);
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已导入 ${result.wordBook!.wordCount} 个单词')),

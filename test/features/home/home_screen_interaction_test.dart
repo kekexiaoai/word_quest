@@ -407,8 +407,14 @@ mountain,高山
     await tester.tap(find.text('喂食豆豆'));
     await tester.pumpAndSettle();
 
+    final restoredAnswerStorage = <AnswerRecord>[];
     await tester.pumpWidget(MaterialApp(
-      home: HomeScreen(adventureRepository: adventureRepository),
+      home: HomeScreen(
+        adventureRepository: adventureRepository,
+        answerRecordRepository:
+            InMemoryAnswerRecordRepository(storage: restoredAnswerStorage),
+        wordBookRepository: const InMemoryWordBookRepository(),
+      ),
     ));
     await tester.pumpAndSettle();
 
