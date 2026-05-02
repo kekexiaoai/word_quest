@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/adventure/application/adventure_level_quiz_builder.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
+import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
 
 void main() {
@@ -66,6 +67,37 @@ void main() {
     expect(quiz.choices, ['neighbor', 'library', 'through']);
   });
 
+  test('复习探索关优先根据听力薄弱记录生成题目', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[1],
+      answerRecords: [
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'library',
+          practiceMode: PracticeMode.listeningChoice,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 8),
+          elapsedMilliseconds: 1200,
+          weaknessType: AnswerWeaknessType.listening,
+        ),
+      ],
+    );
+
+    expect(quiz.activityTitle, '薄弱点复习');
+    expect(quiz.instruction, '听发音，选择对应单词');
+    expect(quiz.prompt, 'library');
+    expect(quiz.wordId, 'library');
+    expect(quiz.practiceMode, PracticeMode.listeningChoice);
+    expect(quiz.correctAnswer, 'library');
+  });
+
   test('错词 Boss 关生成正向挑战题组', () {
     const repository = InMemoryAdventureRepository();
     const builder = AdventureLevelQuizBuilder();
@@ -82,5 +114,44 @@ void main() {
     expect(quiz.prompt, 'through');
     expect(quiz.correctAnswer, '穿过');
     expect(quiz.successTitle, '收服成功');
+  });
+
+  test('错词 Boss 优先根据真实错题记录生成题目', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[2],
+      answerRecords: [
+        AnswerRecord(
+          childId: 'child-sister',
+          wordId: 'library',
+          practiceMode: PracticeMode.englishToChinese,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 8),
+          elapsedMilliseconds: 1000,
+          weaknessType: AnswerWeaknessType.meaning,
+        ),
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          practiceMode: PracticeMode.englishToChinese,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 9),
+          elapsedMilliseconds: 900,
+          weaknessType: AnswerWeaknessType.meaning,
+        ),
+      ],
+    );
+
+    expect(quiz.activityTitle, '错词 Boss');
+    expect(quiz.prompt, 'neighbor');
+    expect(quiz.wordId, 'neighbor');
+    expect(quiz.correctAnswer, '邻居');
+    expect(quiz.choices, contains('邻居'));
   });
 }

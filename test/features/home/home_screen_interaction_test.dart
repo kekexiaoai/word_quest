@@ -129,6 +129,33 @@ void main() {
     expect(storage.last.weaknessType, isNull);
   });
 
+  testWidgets('继续学习会根据学习记录进入薄弱点复习', (tester) async {
+    final recordRepository = InMemoryAnswerRecordRepository(storage: [
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'library',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+    ]);
+    await _pumpHome(tester, answerRecordRepository: recordRepository);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('薄弱点复习'), findsOneWidget);
+    expect(find.text('听发音，选择对应单词'), findsOneWidget);
+
+    await tester.tap(find.text('library').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('薄弱点修复'), findsOneWidget);
+  });
+
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
     await _pumpHome(tester);
 
@@ -344,12 +371,13 @@ Future<void> _pumpHome(
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final storage = <String, AdventureDashboardSnapshot>{};
+  final answerStorage = <AnswerRecord>[];
   await tester.pumpWidget(MaterialApp(
     home: HomeScreen(
       adventureRepository:
           adventureRepository ?? InMemoryAdventureRepository(storage: storage),
-      answerRecordRepository:
-          answerRecordRepository ?? const InMemoryAnswerRecordRepository(),
+      answerRecordRepository: answerRecordRepository ??
+          InMemoryAnswerRecordRepository(storage: answerStorage),
     ),
   ));
 }

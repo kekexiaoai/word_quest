@@ -1,5 +1,6 @@
 import '../domain/adventure_level.dart';
 import '../domain/adventure_level_quiz.dart';
+import '../../study/domain/answer_record.dart';
 import '../../study/domain/study_task.dart';
 
 class AdventureLevelQuizBuilder {
@@ -8,11 +9,14 @@ class AdventureLevelQuizBuilder {
   AdventureLevelQuiz buildForLevel(
     AdventureLevel level, {
     int questionIndex = 0,
+    List<AnswerRecord> answerRecords = const [],
   }) {
     return switch (level.type) {
       AdventureLevelType.newWordWarmup => _newWordWarmup(level, questionIndex),
-      AdventureLevelType.reviewExplore => _reviewExplore(level, questionIndex),
-      AdventureLevelType.mistakeBoss => _mistakeBoss(level, questionIndex),
+      AdventureLevelType.reviewExplore =>
+        _reviewExplore(level, questionIndex, answerRecords),
+      AdventureLevelType.mistakeBoss =>
+        _mistakeBoss(level, questionIndex, answerRecords),
       AdventureLevelType.chestSettlement =>
         _chestSettlement(level, questionIndex),
     };
@@ -44,7 +48,17 @@ class AdventureLevelQuizBuilder {
     );
   }
 
-  AdventureLevelQuiz _reviewExplore(AdventureLevel level, int questionIndex) {
+  AdventureLevelQuiz _reviewExplore(
+    AdventureLevel level,
+    int questionIndex,
+    List<AnswerRecord> answerRecords,
+  ) {
+    final weaknessSeeds = _weaknessReviewSeeds(level, answerRecords);
+    if (weaknessSeeds.isNotEmpty) {
+      final seed = _seedAt(weaknessSeeds, questionIndex);
+      return _weaknessReviewQuiz(level, questionIndex, seed);
+    }
+
     final seed = _seedAt(
       const [
         _QuizSeed(
@@ -82,7 +96,30 @@ class AdventureLevelQuizBuilder {
     );
   }
 
-  AdventureLevelQuiz _mistakeBoss(AdventureLevel level, int questionIndex) {
+  AdventureLevelQuiz _mistakeBoss(
+    AdventureLevel level,
+    int questionIndex,
+    List<AnswerRecord> answerRecords,
+  ) {
+    final mistakeSeeds = _mistakeSeeds(level, answerRecords);
+    if (mistakeSeeds.isNotEmpty) {
+      final word = _seedAt(mistakeSeeds, questionIndex);
+      return AdventureLevelQuiz(
+        activityTitle: '错词 Boss',
+        progressLabel: _progressLabel(level, questionIndex),
+        progressValue: _progressValue(level, questionIndex),
+        instruction: '收服真实错题',
+        wordId: word.id,
+        practiceMode: PracticeMode.englishToChinese,
+        prompt: word.spelling,
+        correctAnswer: word.meaning,
+        choices: _meaningChoices(word),
+        successTitle: '收服成功',
+        explanation: '${word.spelling} 是最近答错过的词，这次收服后会降低它的迷雾值。',
+        usesAudioPrompt: false,
+      );
+    }
+
     final seed = _seedAt(
       const [
         _QuizSeed(prompt: 'through', correctAnswer: '穿过'),
@@ -108,6 +145,28 @@ class AdventureLevelQuizBuilder {
     );
   }
 
+  AdventureLevelQuiz _weaknessReviewQuiz(
+    AdventureLevel level,
+    int questionIndex,
+    _WeaknessReviewSeed seed,
+  ) {
+    final word = seed.word;
+    return AdventureLevelQuiz(
+      activityTitle: '薄弱点复习',
+      progressLabel: _progressLabel(level, questionIndex),
+      progressValue: _progressValue(level, questionIndex),
+      instruction: _instructionFor(seed.practiceMode),
+      wordId: word.id,
+      practiceMode: seed.practiceMode,
+      prompt: _promptFor(word, seed.practiceMode),
+      correctAnswer: _correctAnswerFor(word, seed.practiceMode),
+      choices: _choicesFor(word, seed.practiceMode),
+      successTitle: '薄弱点修复',
+      explanation: _explanationFor(word, seed.weaknessType),
+      usesAudioPrompt: seed.practiceMode == PracticeMode.listeningChoice,
+    );
+  }
+
   AdventureLevelQuiz _chestSettlement(AdventureLevel level, int questionIndex) {
     return AdventureLevelQuiz(
       activityTitle: '宝箱回顾',
@@ -125,7 +184,7 @@ class AdventureLevelQuizBuilder {
     );
   }
 
-  _QuizSeed _seedAt(List<_QuizSeed> seeds, int questionIndex) {
+  T _seedAt<T>(List<T> seeds, int questionIndex) {
     return seeds[questionIndex % seeds.length];
   }
 
@@ -140,7 +199,159 @@ class AdventureLevelQuizBuilder {
     final displayIndex = questionIndex.clamp(0, questionCount - 1) + 1;
     return displayIndex / questionCount;
   }
+
+  List<_WeaknessReviewSeed> _weaknessReviewSeeds(
+    AdventureLevel level,
+    List<AnswerRecord> answerRecords,
+  ) {
+    final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
+    final seenWordIds = <String>{};
+    final seeds = <_WeaknessReviewSeed>[];
+
+    for (final record in sortedRecords) {
+      final weaknessType = record.weaknessType;
+      final word = _knownWordById(record.wordId);
+      if (weaknessType == null || word == null || !seenWordIds.add(word.id)) {
+        continue;
+      }
+
+      seeds.add(
+        _WeaknessReviewSeed(
+          word: word,
+          weaknessType: weaknessType,
+          practiceMode: _practiceModeFor(weaknessType),
+        ),
+      );
+    }
+
+    return seeds;
+  }
+
+  List<_KnownWord> _mistakeSeeds(
+    AdventureLevel level,
+    List<AnswerRecord> answerRecords,
+  ) {
+    final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
+    final seenWordIds = <String>{};
+    final words = <_KnownWord>[];
+
+    for (final record in sortedRecords) {
+      final word = _knownWordById(record.wordId);
+      if (word == null || !seenWordIds.add(word.id)) {
+        continue;
+      }
+      words.add(word);
+    }
+
+    return words;
+  }
+
+  List<AnswerRecord> _sortedIncorrectRecords(
+    AdventureLevel level,
+    List<AnswerRecord> answerRecords,
+  ) {
+    final records = [
+      for (final record in answerRecords)
+        if (record.childId == level.childId && !record.isCorrect) record,
+    ];
+
+    records.sort((a, b) => b.answeredAt.compareTo(a.answeredAt));
+    return records;
+  }
+
+  _KnownWord? _knownWordById(String id) {
+    for (final word in _knownWords) {
+      if (word.id == id) {
+        return word;
+      }
+    }
+    return null;
+  }
+
+  PracticeMode _practiceModeFor(AnswerWeaknessType weaknessType) {
+    return switch (weaknessType) {
+      AnswerWeaknessType.meaning => PracticeMode.englishToChinese,
+      AnswerWeaknessType.spelling => PracticeMode.chineseToEnglish,
+      AnswerWeaknessType.listening => PracticeMode.listeningChoice,
+    };
+  }
+
+  String _instructionFor(PracticeMode practiceMode) {
+    return switch (practiceMode) {
+      PracticeMode.englishToChinese => '看单词，修复释义薄弱点',
+      PracticeMode.chineseToEnglish => '看释义，选择正确拼写',
+      PracticeMode.listeningChoice => '听发音，选择对应单词',
+      PracticeMode.spelling => '看释义，拼出单词',
+      PracticeMode.listeningSpelling => '听发音，拼出单词',
+    };
+  }
+
+  String _promptFor(_KnownWord word, PracticeMode practiceMode) {
+    return switch (practiceMode) {
+      PracticeMode.englishToChinese ||
+      PracticeMode.listeningChoice =>
+        word.spelling,
+      PracticeMode.chineseToEnglish ||
+      PracticeMode.spelling ||
+      PracticeMode.listeningSpelling =>
+        word.meaning,
+    };
+  }
+
+  String _correctAnswerFor(_KnownWord word, PracticeMode practiceMode) {
+    return switch (practiceMode) {
+      PracticeMode.englishToChinese => word.meaning,
+      PracticeMode.chineseToEnglish ||
+      PracticeMode.spelling ||
+      PracticeMode.listeningChoice ||
+      PracticeMode.listeningSpelling =>
+        word.spelling,
+    };
+  }
+
+  List<String> _choicesFor(_KnownWord word, PracticeMode practiceMode) {
+    return switch (practiceMode) {
+      PracticeMode.englishToChinese => _meaningChoices(word),
+      PracticeMode.chineseToEnglish ||
+      PracticeMode.spelling ||
+      PracticeMode.listeningChoice ||
+      PracticeMode.listeningSpelling =>
+        _spellingChoices(word),
+    };
+  }
+
+  List<String> _meaningChoices(_KnownWord word) {
+    return [
+      word.meaning,
+      for (final candidate in _knownWords)
+        if (candidate.id != word.id) candidate.meaning,
+    ].take(3).toList();
+  }
+
+  List<String> _spellingChoices(_KnownWord word) {
+    return [
+      word.spelling,
+      for (final candidate in _knownWords)
+        if (candidate.id != word.id) candidate.spelling,
+    ].take(3).toList();
+  }
+
+  String _explanationFor(_KnownWord word, AnswerWeaknessType weaknessType) {
+    return switch (weaknessType) {
+      AnswerWeaknessType.meaning =>
+        '${word.spelling} 的意思是${word.meaning}，这次专门修复释义薄弱点。',
+      AnswerWeaknessType.spelling =>
+        '${word.meaning} 对应 ${word.spelling}，注意拼写顺序。',
+      AnswerWeaknessType.listening => '听到 ${word.spelling} 的发音时，要先锁定这个单词。',
+    };
+  }
 }
+
+const _knownWords = [
+  _KnownWord(id: 'library', spelling: 'library', meaning: '图书馆'),
+  _KnownWord(id: 'neighbor', spelling: 'neighbor', meaning: '邻居'),
+  _KnownWord(id: 'through', spelling: 'through', meaning: '穿过'),
+];
 
 class _QuizSeed {
   const _QuizSeed({
@@ -152,4 +363,28 @@ class _QuizSeed {
   final String prompt;
   final String correctAnswer;
   final String explanation;
+}
+
+class _KnownWord {
+  const _KnownWord({
+    required this.id,
+    required this.spelling,
+    required this.meaning,
+  });
+
+  final String id;
+  final String spelling;
+  final String meaning;
+}
+
+class _WeaknessReviewSeed {
+  const _WeaknessReviewSeed({
+    required this.word,
+    required this.weaknessType,
+    required this.practiceMode,
+  });
+
+  final _KnownWord word;
+  final AnswerWeaknessType weaknessType;
+  final PracticeMode practiceMode;
 }

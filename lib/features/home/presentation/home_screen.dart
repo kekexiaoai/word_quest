@@ -13,6 +13,7 @@ import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
 import '../../study/application/in_memory_answer_record_repository.dart';
 import '../../study/application/study_answer_evaluator.dart';
+import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/study_question.dart';
 
@@ -1437,6 +1438,7 @@ class _StudyQuizScreen extends StatefulWidget {
 class _StudyQuizScreenState extends State<_StudyQuizScreen> {
   static const _answerEvaluator = StudyAnswerEvaluator();
 
+  late final List<AnswerRecord> _answerRecordsSnapshot;
   late final List<int> _questionQueue = List<int>.generate(
     widget.level.questionCount <= 0 ? 1 : widget.level.questionCount,
     (index) => index,
@@ -1447,11 +1449,20 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
   bool _showFeedback = false;
 
   @override
+  void initState() {
+    super.initState();
+    _answerRecordsSnapshot = widget.answerRecordRepository.loadRecords(
+      childId: widget.childId,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final questionIndex = _questionQueue[_queueCursor];
     final quiz = const AdventureLevelQuizBuilder().buildForLevel(
       widget.level,
       questionIndex: questionIndex,
+      answerRecords: _answerRecordsSnapshot,
     );
     final isAnswerCorrect = _selectedAnswer == quiz.correctAnswer;
     final isLastQueuedQuestion = _queueCursor >= _questionQueue.length - 1;
