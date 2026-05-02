@@ -119,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isStudying = false;
   bool _isComplete = false;
   bool _isParentMode = false;
+  String? _selectedParentDetailChildId;
 
   @override
   void initState() {
@@ -237,6 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onChanged: (tab) {
                 setState(() {
                   _selectedTab = tab;
+                  if (tab != _HomeTab.today) {
+                    _selectedParentDetailChildId = null;
+                  }
                 });
               },
             ),
@@ -258,11 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTabContent(ChildDashboardSnapshot currentChild) {
     return switch (_selectedTab) {
       _HomeTab.today => _isParentMode
-          ? _ParentDashboardTabView(
-              children: _dashboard.children,
-              summaries: _parentChildSummaries(),
-              onManageData: _openDataManagement,
-            )
+          ? _buildParentTodayTab()
           : _TodayTabView(
               currentChild: currentChild,
               adventure: _adventure,
@@ -298,6 +298,38 @@ class _HomeScreenState extends State<HomeScreen> {
           onManageData: _openDataManagement,
         ),
     };
+  }
+
+  Widget _buildParentTodayTab() {
+    final summaries = _parentChildSummaries();
+    _ParentChildSummary? selectedSummary;
+    for (final summary in summaries) {
+      if (summary.child.id == _selectedParentDetailChildId) {
+        selectedSummary = summary;
+        break;
+      }
+    }
+    if (selectedSummary != null) {
+      return _ParentChildDetailView(
+        summary: selectedSummary,
+        onBack: () {
+          setState(() {
+            _selectedParentDetailChildId = null;
+          });
+        },
+      );
+    }
+
+    return _ParentDashboardTabView(
+      children: _dashboard.children,
+      summaries: summaries,
+      onSelectChild: (summary) {
+        setState(() {
+          _selectedParentDetailChildId = summary.child.id;
+        });
+      },
+      onManageData: _openDataManagement,
+    );
   }
 
   WordBook? get _selectedWordBook {
@@ -340,6 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeLevel = null;
       _isStudying = false;
       _isComplete = false;
+      _selectedParentDetailChildId = null;
       _adventure = _loadPlannedAdventure(
         childId: childId,
         referenceDate: DateTime.now(),
@@ -958,11 +991,13 @@ class _ParentDashboardTabView extends StatelessWidget {
   const _ParentDashboardTabView({
     required this.children,
     required this.summaries,
+    required this.onSelectChild,
     required this.onManageData,
   });
 
   final List<ChildDashboardSnapshot> children;
   final List<_ParentChildSummary> summaries;
+  final ValueChanged<_ParentChildSummary> onSelectChild;
   final VoidCallback onManageData;
 
   @override
@@ -1002,7 +1037,10 @@ class _ParentDashboardTabView extends StatelessWidget {
         const _SectionTitle('孩子总览'),
         const SizedBox(height: 14),
         for (final summary in summaries) ...[
-          _ParentChildSummaryCard(summary: summary),
+          _ParentChildSummaryCard(
+            summary: summary,
+            onTap: () => onSelectChild(summary),
+          ),
           const SizedBox(height: 14),
         ],
       ],
@@ -1077,9 +1115,365 @@ class _BackupEntryCard extends StatelessWidget {
 }
 
 class _ParentChildSummaryCard extends StatelessWidget {
-  const _ParentChildSummaryCard({required this.summary});
+  const _ParentChildSummaryCard({
+    required this.summary,
+    required this.onTap,
+  });
 
   final _ParentChildSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: ValueKey('parent_child_card_${summary.child.id}'),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF2F856F),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      _firstCharacter(summary.child.name),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          summary.child.name,
+                          style: const TextStyle(
+                            color: Color(0xFF111114),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          summary.child.gradeLabel,
+                          style: const TextStyle(
+                            color: Color(0xFF70727A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _ProgressBubble(label: '${summary.completionPercent}%'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: summary.completion,
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFFE2E2E8),
+                  color: const Color(0xFF2F856F),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _CompactBadge(
+                    label: '今日完成 ${summary.completionPercent}%',
+                    icon: Icons.flag_rounded,
+                    color: const Color(0xFF2F856F),
+                    backgroundColor: const Color(0xFFE5F8EC),
+                  ),
+                  _CompactBadge(
+                    label: '近 7 日正确率 ${summary.accuracyPercent}%',
+                    icon: Icons.check_circle_rounded,
+                    color: const Color(0xFF5856D6),
+                    backgroundColor: const Color(0xFFECEBFF),
+                  ),
+                  _CompactBadge(
+                    label: '到期复习 ${summary.dueReviewCount} 个',
+                    icon: Icons.schedule_rounded,
+                    color: const Color(0xFFFF9500),
+                    backgroundColor: const Color(0xFFFFF2D9),
+                  ),
+                  _CompactBadge(
+                    label: '高频错词 ${summary.frequentMistakeLabel}',
+                    icon: Icons.warning_amber_rounded,
+                    color: const Color(0xFFFF3B30),
+                    backgroundColor: const Color(0xFFFFE9E7),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ParentChildDetailView extends StatelessWidget {
+  const _ParentChildDetailView({
+    required this.summary,
+    required this.onBack,
+  });
+
+  final _ParentChildSummary summary;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: _tabContentPadding,
+      children: [
+        _Header(
+          title: '${summary.child.name}详情',
+          eyebrow: summary.child.gradeLabel,
+          trailing: IconButton.filledTonal(
+            key: const ValueKey('parent_child_detail_back'),
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: '返回总览',
+          ),
+        ),
+        const SizedBox(height: 28),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                value: '${summary.completionPercent}%',
+                label: '今日完成',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: '${summary.accuracyPercent}%',
+                label: '近 7 日正确率',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _TrendCard(points: summary.trendPoints),
+        const SizedBox(height: 24),
+        _MistakeWordCard(mistakeWords: summary.mistakeWords),
+        const SizedBox(height: 24),
+        _ReviewAdviceCard(advice: summary.reviewAdvice),
+        const SizedBox(height: 24),
+        _WordBookCompletionCard(summary: summary),
+      ],
+    );
+  }
+}
+
+class _TrendCard extends StatelessWidget {
+  const _TrendCard({required this.points});
+
+  final List<_DailyAccuracyPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InsightCard(
+      title: '近 7 日趋势',
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (final point in points) ...[
+            Expanded(child: _TrendColumn(point: point)),
+            if (point != points.last) const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TrendColumn extends StatelessWidget {
+  const _TrendColumn({required this.point});
+
+  final _DailyAccuracyPoint point;
+
+  @override
+  Widget build(BuildContext context) {
+    final barHeight = point.hasRecords ? 28 + point.accuracy * 54 : 12.0;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          point.accuracyLabel,
+          style: const TextStyle(
+            color: Color(0xFF70727A),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: barHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: point.hasRecords
+                ? const Color(0xFF2F856F)
+                : const Color(0xFFE2E2E8),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          point.dateLabel,
+          style: const TextStyle(
+            color: Color(0xFF111114),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MistakeWordCard extends StatelessWidget {
+  const _MistakeWordCard({required this.mistakeWords});
+
+  final List<_MistakeWordSummary> mistakeWords;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InsightCard(
+      title: '高频错词',
+      child: mistakeWords.isEmpty
+          ? const Text(
+              '暂无错词',
+              style: TextStyle(
+                color: Color(0xFF70727A),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          : Column(
+              children: [
+                for (final mistakeWord in mistakeWords) ...[
+                  _DetailRow(
+                    icon: Icons.warning_amber_rounded,
+                    iconColor: const Color(0xFFFF3B30),
+                    label: '${mistakeWord.spelling} · ${mistakeWord.count} 次',
+                  ),
+                  if (mistakeWord != mistakeWords.last)
+                    const SizedBox(height: 10),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _ReviewAdviceCard extends StatelessWidget {
+  const _ReviewAdviceCard({required this.advice});
+
+  final String advice;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InsightCard(
+      title: '复习建议',
+      child: _DetailRow(
+        icon: Icons.tips_and_updates_rounded,
+        iconColor: const Color(0xFFFF9500),
+        label: advice,
+      ),
+    );
+  }
+}
+
+class _WordBookCompletionCard extends StatelessWidget {
+  const _WordBookCompletionCard({required this.summary});
+
+  final _ParentChildSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InsightCard(
+      title: '词表完成情况',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  summary.wordBookName,
+                  style: const TextStyle(
+                    color: Color(0xFF111114),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                '${summary.wordBookCompletionPercent}%',
+                style: const TextStyle(
+                  color: Color(0xFF2F856F),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: summary.wordBookCompletion,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E2E8),
+              color: const Color(0xFF2F856F),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '已掌握 ${summary.masteredWordCount} / ${summary.wordBookWordCount}',
+            style: const TextStyle(
+              color: Color(0xFF70727A),
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -1092,98 +1486,114 @@ class _ParentChildSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF2F856F),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  _firstCharacter(summary.child.name),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      summary.child.name,
-                      style: const TextStyle(
-                        color: Color(0xFF111114),
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      summary.child.gradeLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF70727A),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _ProgressBubble(label: '${summary.completionPercent}%'),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: summary.completion,
-              minHeight: 8,
-              backgroundColor: const Color(0xFFE2E2E8),
-              color: const Color(0xFF2F856F),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _CompactBadge(
-                label: '今日完成 ${summary.completionPercent}%',
-                icon: Icons.flag_rounded,
-                color: const Color(0xFF2F856F),
-                backgroundColor: const Color(0xFFE5F8EC),
-              ),
-              _CompactBadge(
-                label: '近 7 日正确率 ${summary.accuracyPercent}%',
-                icon: Icons.check_circle_rounded,
-                color: const Color(0xFF5856D6),
-                backgroundColor: const Color(0xFFECEBFF),
-              ),
-              _CompactBadge(
-                label: '到期复习 ${summary.dueReviewCount} 个',
-                icon: Icons.schedule_rounded,
-                color: const Color(0xFFFF9500),
-                backgroundColor: const Color(0xFFFFF2D9),
-              ),
-              _CompactBadge(
-                label: '高频错词 ${summary.frequentMistakeLabel}',
-                icon: Icons.warning_amber_rounded,
-                color: const Color(0xFFFF3B30),
-                backgroundColor: const Color(0xFFFFE9E7),
-              ),
-            ],
-          ),
+          const SizedBox(height: 16),
+          child,
         ],
       ),
     );
   }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: iconColor, size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DailyAccuracyPoint {
+  const _DailyAccuracyPoint({
+    required this.date,
+    required this.totalCount,
+    required this.correctCount,
+  });
+
+  final DateTime date;
+  final int totalCount;
+  final int correctCount;
+
+  bool get hasRecords {
+    return totalCount > 0;
+  }
+
+  double get accuracy {
+    if (!hasRecords) {
+      return 0;
+    }
+    return correctCount / totalCount;
+  }
+
+  String get accuracyLabel {
+    return hasRecords ? '${(accuracy * 100).round()}%' : '--';
+  }
+
+  String get dateLabel {
+    return '${date.month}/${date.day}';
+  }
+
+  static _DailyAccuracyPoint fromRecords({
+    required DateTime date,
+    required List<AnswerRecord> records,
+  }) {
+    final recordsOfDay = [
+      for (final record in records)
+        if (_isSameDay(record.answeredAt, date)) record,
+    ];
+    return _DailyAccuracyPoint(
+      date: date,
+      totalCount: recordsOfDay.length,
+      correctCount: recordsOfDay.where((record) => record.isCorrect).length,
+    );
+  }
+
+  static bool _isSameDay(DateTime left, DateTime right) {
+    return left.year == right.year &&
+        left.month == right.month &&
+        left.day == right.day;
+  }
+}
+
+class _MistakeWordSummary {
+  const _MistakeWordSummary({
+    required this.spelling,
+    required this.count,
+  });
+
+  final String spelling;
+  final int count;
 }
 
 class _ParentChildSummary {
@@ -1193,6 +1603,12 @@ class _ParentChildSummary {
     required this.accuracyPercent,
     required this.dueReviewCount,
     required this.frequentMistakeLabel,
+    required this.trendPoints,
+    required this.mistakeWords,
+    required this.reviewAdvice,
+    required this.wordBookName,
+    required this.wordBookWordCount,
+    required this.masteredWordCount,
   });
 
   final ChildDashboardSnapshot child;
@@ -1200,9 +1616,26 @@ class _ParentChildSummary {
   final int accuracyPercent;
   final int dueReviewCount;
   final String frequentMistakeLabel;
+  final List<_DailyAccuracyPoint> trendPoints;
+  final List<_MistakeWordSummary> mistakeWords;
+  final String reviewAdvice;
+  final String wordBookName;
+  final int wordBookWordCount;
+  final int masteredWordCount;
 
   int get completionPercent {
     return (completion * 100).round();
+  }
+
+  double get wordBookCompletion {
+    if (wordBookWordCount <= 0) {
+      return 0;
+    }
+    return masteredWordCount / wordBookWordCount;
+  }
+
+  int get wordBookCompletionPercent {
+    return (wordBookCompletion * 100).round();
   }
 
   static _ParentChildSummary from({
@@ -1227,6 +1660,25 @@ class _ParentChildSummary {
       ),
       frequentMistakeLabel: _frequentMistakeLabel(
         answerRecords: recentRecords,
+        wordBook: wordBook,
+      ),
+      trendPoints: _trendPoints(
+        answerRecords: recentRecords,
+        referenceDate: referenceDate,
+      ),
+      mistakeWords: _mistakeWords(
+        answerRecords: recentRecords,
+        wordBook: wordBook,
+      ),
+      reviewAdvice: _reviewAdvice(
+        learningProgresses: learningProgresses,
+        wordBook: wordBook,
+        referenceDate: referenceDate,
+      ),
+      wordBookName: wordBook?.name ?? '尚未选择词表',
+      wordBookWordCount: wordBook?.wordCount ?? 0,
+      masteredWordCount: _masteredWordCount(
+        learningProgresses: learningProgresses,
         wordBook: wordBook,
       ),
     );
@@ -1282,6 +1734,104 @@ class _ParentChildSummary {
       );
       return !nextReviewDay.isAfter(referenceDay);
     }).length;
+  }
+
+  static int _mistakeReviewCount({
+    required List<WordLearningProgress> learningProgresses,
+    required WordBook? wordBook,
+  }) {
+    if (wordBook == null) {
+      return 0;
+    }
+    final wordIds = {for (final word in wordBook.words) word.id};
+    return learningProgresses.where((progress) {
+      return wordIds.contains(progress.wordId) &&
+          progress.consecutiveMistakes > 0;
+    }).length;
+  }
+
+  static int _masteredWordCount({
+    required List<WordLearningProgress> learningProgresses,
+    required WordBook? wordBook,
+  }) {
+    if (wordBook == null) {
+      return 0;
+    }
+    final wordIds = {for (final word in wordBook.words) word.id};
+    return learningProgresses.where((progress) {
+      return wordIds.contains(progress.wordId) && progress.isMastered;
+    }).length;
+  }
+
+  static List<_DailyAccuracyPoint> _trendPoints({
+    required List<AnswerRecord> answerRecords,
+    required DateTime referenceDate,
+  }) {
+    final referenceDay = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
+    return [
+      for (var offset = 6; offset >= 0; offset -= 1)
+        _DailyAccuracyPoint.fromRecords(
+          date: referenceDay.subtract(Duration(days: offset)),
+          records: answerRecords,
+        ),
+    ];
+  }
+
+  static List<_MistakeWordSummary> _mistakeWords({
+    required List<AnswerRecord> answerRecords,
+    required WordBook? wordBook,
+  }) {
+    final mistakeCounts = <String, int>{};
+    for (final record in answerRecords) {
+      if (record.isCorrect) {
+        continue;
+      }
+      mistakeCounts[record.wordId] = (mistakeCounts[record.wordId] ?? 0) + 1;
+    }
+    final summaries = [
+      for (final entry in mistakeCounts.entries)
+        _MistakeWordSummary(
+          spelling: _wordSpelling(wordId: entry.key, wordBook: wordBook),
+          count: entry.value,
+        ),
+    ]..sort((a, b) {
+        final countCompare = b.count.compareTo(a.count);
+        if (countCompare != 0) {
+          return countCompare;
+        }
+        return a.spelling.compareTo(b.spelling);
+      });
+    return summaries.take(5).toList();
+  }
+
+  static String _reviewAdvice({
+    required List<WordLearningProgress> learningProgresses,
+    required WordBook? wordBook,
+    required DateTime referenceDate,
+  }) {
+    final mistakeCount = _mistakeReviewCount(
+      learningProgresses: learningProgresses,
+      wordBook: wordBook,
+    );
+    final dueCount = _dueReviewCount(
+      learningProgresses: learningProgresses,
+      wordBook: wordBook,
+      referenceDate: referenceDate,
+    );
+    if (mistakeCount > 0 && dueCount > 0) {
+      return '先修复 $mistakeCount 个错词，再复习 $dueCount 个到期词';
+    }
+    if (mistakeCount > 0) {
+      return '先修复 $mistakeCount 个错词，降低连续错误';
+    }
+    if (dueCount > 0) {
+      return '今天优先复习 $dueCount 个到期词';
+    }
+    return '今天适合学习新词，保持稳定节奏';
   }
 
   static String _frequentMistakeLabel({
