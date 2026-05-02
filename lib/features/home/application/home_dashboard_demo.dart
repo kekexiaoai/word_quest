@@ -83,11 +83,6 @@ class HomeDashboardDemo {
           weaknessType: AnswerWeaknessType.spelling,
         ),
         _RecordSeed(
-          answeredAt: DateTime(2026, 5, 2, 8, 15),
-          practiceMode: PracticeMode.listeningChoice,
-          isCorrect: true,
-        ),
-        _RecordSeed(
           answeredAt: DateTime(2026, 5, 1, 8),
           practiceMode: PracticeMode.englishToChinese,
           isCorrect: true,
@@ -109,11 +104,6 @@ class HomeDashboardDemo {
           isCorrect: true,
         ),
         _RecordSeed(
-          answeredAt: DateTime(2026, 4, 30, 8, 5),
-          practiceMode: PracticeMode.englishToChinese,
-          isCorrect: true,
-        ),
-        _RecordSeed(
           answeredAt: DateTime(2026, 4, 30, 8, 10),
           practiceMode: PracticeMode.listeningChoice,
           isCorrect: true,
@@ -125,19 +115,13 @@ class HomeDashboardDemo {
           isCorrect: true,
         ),
         _RecordSeed(
-          answeredAt: DateTime(2026, 4, 29, 8, 5),
+          answeredAt: DateTime(2026, 4, 28, 8),
           practiceMode: PracticeMode.spelling,
           isCorrect: true,
         ),
         _RecordSeed(
-          answeredAt: DateTime(2026, 4, 28, 8),
+          answeredAt: DateTime(2026, 4, 27, 8),
           practiceMode: PracticeMode.englishToChinese,
-          isCorrect: false,
-          weaknessType: AnswerWeaknessType.spelling,
-        ),
-        _RecordSeed(
-          answeredAt: DateTime(2026, 4, 28, 8, 5),
-          practiceMode: PracticeMode.listeningSpelling,
           isCorrect: true,
         ),
       ],
@@ -264,15 +248,15 @@ class HomeDashboardDemo {
           task: _buildTask(
             childId: child.id,
             date: _sameDayAt(referenceDate, 18),
-            newWordLimit: 12,
-            reviewLimit: 24,
-            mistakeLimit: 6,
+            newWordLimit: 8,
+            reviewLimit: 6,
+            mistakeLimit: 4,
             newWordPrefix: 'brother-new',
             reviewPrefix: 'brother-review',
             mistakePrefix: 'brother-mistake',
           ),
           answerRecords: _brotherRecords(),
-          completedItems: 29,
+          completedItems: 13,
         ),
       'child-sister' => _SeedData(
           task: _buildTask(

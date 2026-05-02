@@ -9,16 +9,16 @@ class InMemoryChildProfileRepository implements ChildProfileRepository {
     return [
       ChildProfile(
         id: 'child-brother',
-        name: '哥哥',
+        name: '安安',
         gradeLabel: '初中词表',
-        avatarSeed: '哥哥',
+        avatarSeed: '安',
         createdAt: DateTime(2026, 5, 1),
       ),
       ChildProfile(
         id: 'child-sister',
-        name: '妹妹',
+        name: '宁宁',
         gradeLabel: '小学高年级词表',
-        avatarSeed: '妹妹',
+        avatarSeed: '宁',
         createdAt: DateTime(2026, 5, 1),
       ),
     ];

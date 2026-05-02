@@ -8,8 +8,8 @@ void main() {
     final children = repository.loadChildren();
 
     expect(children, hasLength(2));
-    expect(children.first.name, '哥哥');
+    expect(children.first.name, '安安');
     expect(children.first.gradeLabel, '初中词表');
-    expect(children.last.name, '妹妹');
+    expect(children.last.name, '宁宁');
   });
 }
