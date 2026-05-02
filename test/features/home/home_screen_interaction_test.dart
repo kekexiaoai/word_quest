@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
+import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/home/presentation/home_screen.dart';
 
 void main() {
@@ -133,6 +135,33 @@ void main() {
     expect(find.text('错词 Boss 关'), findsOneWidget);
   });
 
+  testWidgets('冒险进度会保存到仓库并在首页重建后恢复', (tester) async {
+    final storage = <String, AdventureDashboardSnapshot>{};
+    final adventureRepository = InMemoryAdventureRepository(storage: storage);
+    await _pumpHome(tester, adventureRepository: adventureRepository);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('through'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('喂食豆豆'));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(adventureRepository: adventureRepository),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('豆豆 Lv.3'), findsOneWidget);
+    expect(find.text('饱腹 88%'), findsOneWidget);
+    expect(find.text('错词 Boss 关'), findsOneWidget);
+  });
+
   testWidgets('词表页滚动到底部时内容不会被底部导航遮挡', (tester) async {
     await _pumpHome(tester);
 
@@ -163,11 +192,20 @@ void main() {
   });
 }
 
-Future<void> _pumpHome(WidgetTester tester) async {
+Future<void> _pumpHome(
+  WidgetTester tester, {
+  InMemoryAdventureRepository? adventureRepository,
+}) async {
   tester.view.physicalSize = const Size(430, 932);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+  final storage = <String, AdventureDashboardSnapshot>{};
+  await tester.pumpWidget(MaterialApp(
+    home: HomeScreen(
+      adventureRepository:
+          adventureRepository ?? InMemoryAdventureRepository(storage: storage),
+    ),
+  ));
 }

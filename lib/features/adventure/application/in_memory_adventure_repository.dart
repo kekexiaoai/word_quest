@@ -4,7 +4,17 @@ import '../domain/adventure_repository.dart';
 import '../domain/pet_profile.dart';
 
 class InMemoryAdventureRepository implements AdventureRepository {
-  const InMemoryAdventureRepository();
+  const InMemoryAdventureRepository({
+    Map<String, AdventureDashboardSnapshot>? storage,
+  }) : _storage = storage;
+
+  static final Map<String, AdventureDashboardSnapshot> _sharedStorage = {};
+
+  final Map<String, AdventureDashboardSnapshot>? _storage;
+
+  Map<String, AdventureDashboardSnapshot> get _activeStorage {
+    return _storage ?? _sharedStorage;
+  }
 
   @override
   AdventureDashboardSnapshot loadAdventure({
@@ -16,6 +26,13 @@ class InMemoryAdventureRepository implements AdventureRepository {
       referenceDate.month,
       referenceDate.day,
     );
+    final savedSnapshot = _activeStorage[_storageKey(
+      childId: childId,
+      date: date,
+    )];
+    if (savedSnapshot != null) {
+      return savedSnapshot;
+    }
 
     return AdventureDashboardSnapshot(
       childId: childId,
@@ -101,5 +118,20 @@ class InMemoryAdventureRepository implements AdventureRepository {
         lastFedAt: DateTime(2026, 5, 1, 19),
       ),
     );
+  }
+
+  @override
+  void saveAdventure(AdventureDashboardSnapshot snapshot) {
+    final date =
+        snapshot.levels.isEmpty ? DateTime.now() : snapshot.levels.first.date;
+    _activeStorage[_storageKey(childId: snapshot.childId, date: date)] =
+        snapshot;
+  }
+
+  String _storageKey({
+    required String childId,
+    required DateTime date,
+  }) {
+    return '$childId-${date.year}-${date.month}-${date.day}';
   }
 }

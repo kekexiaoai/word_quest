@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:word_quest/features/adventure/application/adventure_session_controller.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
+import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/adventure/domain/adventure_level.dart';
 import 'package:word_quest/features/adventure/domain/pet_profile.dart';
 
@@ -46,5 +48,33 @@ void main() {
     expect(snapshot.pet.mood, PetMood.waiting);
     expect(snapshot.pet.growthPoints, 42);
     expect(snapshot.pet.growthTarget, 60);
+  });
+
+  test('保存后的冒险状态可以再次读取', () {
+    final storage = <String, AdventureDashboardSnapshot>{};
+    final repository = InMemoryAdventureRepository(storage: storage);
+    const controller = AdventureSessionController();
+    final snapshot = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final completed = controller.completeCurrentLevel(snapshot);
+    final fed = controller.feedPetWithTodayRewards(
+      completed,
+      fedAt: DateTime(2026, 5, 2, 20),
+    );
+    repository.saveAdventure(fed);
+
+    final restored = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    expect(restored.starsEarned, 3);
+    expect(restored.currentLevel.title, '错词 Boss 关');
+    expect(restored.pet.name, '豆豆');
+    expect(restored.pet.level, 3);
+    expect(restored.pet.satiety, 88);
   });
 }

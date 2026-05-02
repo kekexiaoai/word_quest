@@ -7,4 +7,6 @@ abstract class AdventureRepository {
     required String childId,
     required DateTime referenceDate,
   });
+
+  void saveAdventure(AdventureDashboardSnapshot snapshot);
 }

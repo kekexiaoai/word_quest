@@ -102,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _adventure,
                       fedAt: DateTime.now(),
                     );
+                    widget.adventureRepository.saveAdventure(_adventure);
                     _isStudying = false;
                     _isComplete = false;
                     _selectedTab = _HomeTab.today;
@@ -138,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _adventure =
                         _sessionController.completeCurrentLevel(_adventure);
+                    widget.adventureRepository.saveAdventure(_adventure);
                     _isStudying = false;
                     _isComplete = true;
                   });
