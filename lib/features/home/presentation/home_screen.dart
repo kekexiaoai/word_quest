@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../adventure/application/adventure_level_quiz_builder.dart';
 import '../../adventure/application/adventure_session_controller.dart';
@@ -1647,6 +1648,17 @@ class _BackupExportDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        TextButton.icon(
+          key: const ValueKey('data_copy_backup_button'),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: backupJson));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('备份 JSON 已复制')),
+            );
+          },
+          icon: const Icon(Icons.copy_rounded),
+          label: const Text('一键复制'),
+        ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('关闭'),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
@@ -319,6 +320,23 @@ mountain,高山
   });
 
   testWidgets('设置页数据管理支持导出导入和清空学习记录', (tester) async {
+    String? copiedText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText =
+              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
     final answerStorage = <AnswerRecord>[
       AnswerRecord(
         childId: 'child-brother',
@@ -358,6 +376,11 @@ mountain,高山
     await tester.pumpAndSettle();
     expect(find.textContaining('"answerRecords"'), findsOneWidget);
     expect(find.textContaining('我的导入词表'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('data_copy_backup_button')));
+    await tester.pumpAndSettle();
+
+    expect(copiedText, contains('"answerRecords"'));
+    expect(copiedText, contains('我的导入词表'));
 
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
