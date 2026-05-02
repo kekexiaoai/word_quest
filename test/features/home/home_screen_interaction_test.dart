@@ -90,6 +90,14 @@ void main() {
 
     expect(libraryBottom, lessThan(tabBarTop - 12));
   });
+
+  testWidgets('底部导航栏圆角外侧保持透明露出正文', (tester) async {
+    await _pumpHome(tester);
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+
+    expect(scaffold.extendBody, isTrue);
+  });
 }
 
 Future<void> _pumpHome(WidgetTester tester) async {

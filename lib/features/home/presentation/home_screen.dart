@@ -98,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: const Color(0xFFF2F2F7),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(18, 0, 18, 8),
