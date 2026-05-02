@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../adventure/application/in_memory_adventure_repository.dart';
+import '../../adventure/application/adventure_session_controller.dart';
 import '../../adventure/domain/adventure_dashboard_snapshot.dart';
 import '../../adventure/domain/adventure_level.dart';
 import '../../adventure/domain/adventure_repository.dart';
@@ -60,8 +61,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _sessionController = AdventureSessionController();
+
   late final HomeDashboardSnapshot _dashboard;
-  late final AdventureDashboardSnapshot _adventure;
+  late AdventureDashboardSnapshot _adventure;
+  AdventureLevel? _activeLevel;
   _HomeTab _selectedTab = _HomeTab.today;
   bool _isStudying = false;
   bool _isComplete = false;
@@ -92,8 +96,12 @@ class _HomeScreenState extends State<HomeScreen> {
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyCompleteScreen(
                 adventure: _adventure,
-                onBackToday: () {
+                onFeedPet: () {
                   setState(() {
+                    _adventure = _sessionController.feedPetWithTodayRewards(
+                      _adventure,
+                      fedAt: DateTime.now(),
+                    );
                     _isStudying = false;
                     _isComplete = false;
                     _selectedTab = _HomeTab.today;
@@ -120,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyQuizScreen(
+                level: _activeLevel ?? _adventure.currentLevel,
                 onClose: () {
                   setState(() {
                     _isStudying = false;
@@ -127,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 onComplete: () {
                   setState(() {
+                    _adventure =
+                        _sessionController.completeCurrentLevel(_adventure);
                     _isStudying = false;
                     _isComplete = true;
                   });
@@ -178,11 +189,21 @@ class _HomeScreenState extends State<HomeScreen> {
           adventure: _adventure,
           onContinue: () {
             setState(() {
+              _activeLevel = _adventure.currentLevel;
               _isStudying = true;
             });
           },
         ),
-      _HomeTab.quest => _QuestTabView(adventure: _adventure),
+      _HomeTab.quest => _QuestTabView(
+          adventure: _adventure,
+          canEnterLevel: _sessionController.canEnter,
+          onEnterLevel: (level) {
+            setState(() {
+              _activeLevel = level;
+              _isStudying = true;
+            });
+          },
+        ),
       _HomeTab.wordBook => const _WordBookTabView(),
       _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
     };
@@ -785,9 +806,15 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _LearningRouteList extends StatelessWidget {
-  const _LearningRouteList({required this.levels});
+  const _LearningRouteList({
+    required this.levels,
+    required this.canEnterLevel,
+    required this.onEnterLevel,
+  });
 
   final List<AdventureLevel> levels;
+  final bool Function(AdventureLevel level) canEnterLevel;
+  final ValueChanged<AdventureLevel> onEnterLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -802,6 +829,7 @@ class _LearningRouteList extends StatelessWidget {
             subtitle: level.subtitle,
             status: _levelStatusLabel(level.status),
             statusColor: _levelColor(level.status),
+            onTap: canEnterLevel(level) ? () => onEnterLevel(level) : null,
           ),
       ],
     );
@@ -856,6 +884,7 @@ class _RouteRow extends StatelessWidget {
     required this.subtitle,
     this.status,
     this.statusColor = const Color(0xFF9B9BA3),
+    this.onTap,
   });
 
   final IconData icon;
@@ -865,71 +894,82 @@ class _RouteRow extends StatelessWidget {
   final String subtitle;
   final String? status;
   final Color statusColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: iconBackground,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: iconColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF111114),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF70727A),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (status != null)
-            Text(
-              status!,
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: iconBackground,
+                borderRadius: BorderRadius.circular(14),
               ),
-            )
-          else
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF9B9BA3),
+              child: Icon(icon, color: iconColor),
             ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Color(0xFF111114),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF70727A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (status != null)
+              Text(
+                status!,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF9B9BA3),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _QuestTabView extends StatelessWidget {
-  const _QuestTabView({required this.adventure});
+  const _QuestTabView({
+    required this.adventure,
+    required this.canEnterLevel,
+    required this.onEnterLevel,
+  });
 
   final AdventureDashboardSnapshot adventure;
+  final bool Function(AdventureLevel level) canEnterLevel;
+  final ValueChanged<AdventureLevel> onEnterLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -951,7 +991,11 @@ class _QuestTabView extends StatelessWidget {
         const SizedBox(height: 28),
         const _SectionTitle('今日路线'),
         const SizedBox(height: 14),
-        _LearningRouteList(levels: adventure.levels),
+        _LearningRouteList(
+          levels: adventure.levels,
+          canEnterLevel: canEnterLevel,
+          onEnterLevel: onEnterLevel,
+        ),
         const SizedBox(height: 28),
         const _SectionTitle('奖励反馈'),
         const SizedBox(height: 14),
@@ -1361,10 +1405,12 @@ class _ProfileCard extends StatelessWidget {
 
 class _StudyQuizScreen extends StatefulWidget {
   const _StudyQuizScreen({
+    required this.level,
     required this.onClose,
     required this.onComplete,
   });
 
+  final AdventureLevel level;
   final VoidCallback onClose;
   final VoidCallback onComplete;
 
@@ -1387,19 +1433,19 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
               icon: Icons.close_rounded,
               onTap: widget.onClose,
             ),
-            const Expanded(
+            Expanded(
               child: Column(
                 children: [
                   Text(
-                    '听音训练',
-                    style: TextStyle(
+                    widget.level.title,
+                    style: const TextStyle(
                       color: Color(0xFF111114),
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     '6 / 18',
                     style: TextStyle(
                       color: Color(0xFF70727A),
@@ -1436,6 +1482,15 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           child: const Column(
             children: [
               Text(
+                '听音训练',
+                style: TextStyle(
+                  color: Color(0xFF2F856F),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
                 '听发音，选择对应单词',
                 style: TextStyle(
                   color: Color(0xFF70727A),
@@ -1466,6 +1521,8 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           ),
         ),
         const SizedBox(height: 22),
+        _LevelContextPanel(level: widget.level),
+        const SizedBox(height: 16),
         for (final answer in const ['neighbor', 'library', 'through']) ...[
           _ChoiceTile(
             label: answer,
@@ -1574,6 +1631,43 @@ class _ChoiceTile extends StatelessWidget {
   }
 }
 
+class _LevelContextPanel extends StatelessWidget {
+  const _LevelContextPanel({required this.level});
+
+  final AdventureLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF6F1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.explore_rounded,
+            color: _levelColor(level.status),
+            size: 24,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              level.subtitle,
+              style: const TextStyle(
+                color: Color(0xFF2F856F),
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AnswerFeedbackPanel extends StatelessWidget {
   const _AnswerFeedbackPanel();
 
@@ -1613,9 +1707,13 @@ class _AnswerFeedbackPanel extends StatelessWidget {
 }
 
 class _PetRewardStrip extends StatelessWidget {
-  const _PetRewardStrip({required this.adventure});
+  const _PetRewardStrip({
+    required this.adventure,
+    required this.onFeedPet,
+  });
 
   final AdventureDashboardSnapshot adventure;
+  final VoidCallback onFeedPet;
 
   @override
   Widget build(BuildContext context) {
@@ -1646,7 +1744,7 @@ class _PetRewardStrip extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () {},
+            onPressed: onFeedPet,
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFF2F856F),
               textStyle: const TextStyle(
@@ -1755,12 +1853,12 @@ int _totalGrowthReward(List<AdventureLevel> levels) {
 class _StudyCompleteScreen extends StatelessWidget {
   const _StudyCompleteScreen({
     required this.adventure,
-    required this.onBackToday,
+    required this.onFeedPet,
     required this.onReview,
   });
 
   final AdventureDashboardSnapshot adventure;
-  final VoidCallback onBackToday;
+  final VoidCallback onFeedPet;
   final VoidCallback onReview;
 
   @override
@@ -1807,7 +1905,10 @@ class _StudyCompleteScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              _PetRewardStrip(adventure: adventure),
+              _PetRewardStrip(
+                adventure: adventure,
+                onFeedPet: onFeedPet,
+              ),
             ],
           ),
         ),
@@ -1865,7 +1966,7 @@ class _StudyCompleteScreen extends StatelessWidget {
         SizedBox(
           height: 58,
           child: FilledButton(
-            onPressed: onBackToday,
+            onPressed: onFeedPet,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2F856F),
               foregroundColor: Colors.white,

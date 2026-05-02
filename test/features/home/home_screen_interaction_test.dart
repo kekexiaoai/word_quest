@@ -23,6 +23,8 @@ void main() {
     expect(find.text('答对了'), findsOneWidget);
     expect(find.text('through 表示穿过，也可表示从头到尾完成。'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('下一题'));
     await tester.pumpAndSettle();
 
@@ -90,6 +92,45 @@ void main() {
     expect(find.text('家长管理'), findsOneWidget);
     expect(find.text('导入学习备份'), findsOneWidget);
     expect(find.text('内部代号：Word Quest'), findsOneWidget);
+  });
+
+  testWidgets('闯关页当前关卡可以进入，锁定关卡不能进入', (tester) async {
+    await _pumpHome(tester);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_quest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('错词 Boss 关'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('听发音，选择对应单词'), findsNothing);
+    expect(find.text('错词 Boss 关'), findsOneWidget);
+
+    await tester.tap(find.text('复习探索关'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('复习探索关'), findsOneWidget);
+    expect(find.text('6 题 · 选择 / 拼写 / 听音'), findsOneWidget);
+    expect(find.text('听发音，选择对应单词'), findsOneWidget);
+  });
+
+  testWidgets('完成当前关卡后可以喂食宠物并更新首页状态', (tester) async {
+    await _pumpHome(tester);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('through'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('喂食豆豆'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('豆豆 Lv.3'), findsOneWidget);
+    expect(find.text('饱腹 88%'), findsOneWidget);
+    expect(find.text('错词 Boss 关'), findsOneWidget);
   });
 
   testWidgets('词表页滚动到底部时内容不会被底部导航遮挡', (tester) async {
