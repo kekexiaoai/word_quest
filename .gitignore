@@ -1,0 +1,20 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
+
+# Generated platform folders can be recreated by Flutter CLI.
+android/.gradle/
+ios/Pods/
+macos/Pods/
