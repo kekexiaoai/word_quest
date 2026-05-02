@@ -937,12 +937,7 @@ class _TodayTaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentLevel = adventure.currentLevel;
-    final completedLevels = adventure.levels
-        .where((level) => level.status == AdventureLevelStatus.completed)
-        .length;
-    final totalLevels = adventure.levels.isEmpty ? 1 : adventure.levels.length;
-    final progress = completedLevels / totalLevels;
-    final progressPercent = (progress * 100).round();
+    final studyMetrics = _TodayStudyMetrics.from(adventure);
     final questionCount =
         currentLevel.questionCount <= 0 ? 1 : currentLevel.questionCount;
     final taskTitle = currentLevel.type == AdventureLevelType.chestSettlement
@@ -993,18 +988,28 @@ class _TodayTaskCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '预计 ${studyMetrics.remainingMinutes} 分钟 · 今日完成 ${studyMetrics.progressPercent}%',
+                      style: const TextStyle(
+                        color: Color(0xFF70727A),
+                        fontSize: 15,
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 14),
-              _ProgressBubble(label: '$progressPercent%'),
+              _ProgressBubble(label: '${studyMetrics.progressPercent}%'),
             ],
           ),
           const SizedBox(height: 20),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: progress,
+              value: studyMetrics.progress,
               minHeight: 8,
               backgroundColor: const Color(0xFFE2E2E8),
               color: const Color(0xFF2F856F),
@@ -1035,6 +1040,61 @@ class _TodayTaskCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _TodayStudyMetrics {
+  const _TodayStudyMetrics({
+    required this.totalQuestions,
+    required this.completedQuestions,
+  });
+
+  final int totalQuestions;
+  final int completedQuestions;
+
+  int get remainingQuestions {
+    return (totalQuestions - completedQuestions).clamp(0, totalQuestions);
+  }
+
+  int get remainingMinutes {
+    return remainingQuestions <= 0 ? 0 : remainingQuestions;
+  }
+
+  double get progress {
+    if (totalQuestions <= 0) {
+      return 1;
+    }
+    return completedQuestions / totalQuestions;
+  }
+
+  int get progressPercent {
+    return (progress * 100).round();
+  }
+
+  static _TodayStudyMetrics from(AdventureDashboardSnapshot adventure) {
+    final studyLevels = [
+      for (final level in adventure.levels)
+        if (level.type != AdventureLevelType.chestSettlement) level,
+    ];
+    final totalQuestions = studyLevels.fold<int>(
+      0,
+      (sum, level) => sum + _questionCountFor(level),
+    );
+    final completedQuestions = studyLevels.fold<int>(
+      0,
+      (sum, level) => level.status == AdventureLevelStatus.completed
+          ? sum + _questionCountFor(level)
+          : sum,
+    );
+
+    return _TodayStudyMetrics(
+      totalQuestions: totalQuestions,
+      completedQuestions: completedQuestions,
+    );
+  }
+
+  static int _questionCountFor(AdventureLevel level) {
+    return level.questionCount <= 0 ? 0 : level.questionCount;
   }
 }
 
@@ -2038,12 +2098,13 @@ class _SettingsTabView extends StatelessWidget {
               onTap: onManageData,
               key: const ValueKey('settings_data_management'),
             ),
-            const _RouteRow(
+            _RouteRow(
               icon: Icons.download_rounded,
-              iconColor: Color(0xFFFF9500),
-              iconBackground: Color(0xFFFFF2D9),
+              iconColor: const Color(0xFFFF9500),
+              iconBackground: const Color(0xFFFFF2D9),
               title: '导入学习备份',
               subtitle: 'JSON',
+              onTap: onManageData,
             ),
           ],
         ),

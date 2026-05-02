@@ -294,6 +294,8 @@ mountain,高山
     expect(find.text('今日任务'), findsOneWidget);
     expect(find.text('当前关卡还剩 3 题'), findsOneWidget);
     expect(find.text('下一组：复习探索关 · 3 题 · 到期复习'), findsOneWidget);
+    expect(find.text('预计 5 分钟 · 今日完成 55%'), findsOneWidget);
+    expect(find.text('55%'), findsOneWidget);
     expect(find.text('继续学习'), findsOneWidget);
     expect(find.text('今日冒险'), findsOneWidget);
     expect(find.text('森林冒险'), findsOneWidget);
@@ -393,6 +395,12 @@ mountain,高山
     expect(find.text('家长管理'), findsOneWidget);
     expect(find.text('导入学习备份'), findsOneWidget);
     expect(find.text('内部代号：Word Quest'), findsOneWidget);
+
+    await tester.tap(find.text('导入学习备份'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('数据管理'), findsWidgets);
+    expect(find.text('导出备份'), findsOneWidget);
   });
 
   testWidgets('设置页数据管理支持导出导入和清空学习记录', (tester) async {
@@ -674,13 +682,15 @@ Future<void> _pumpHome(
 
   final storage = <String, AdventureDashboardSnapshot>{};
   final answerStorage = <AnswerRecord>[];
+  final progressStorage = <WordLearningProgress>[];
   await tester.pumpWidget(MaterialApp(
     home: HomeScreen(
       adventureRepository:
           adventureRepository ?? InMemoryAdventureRepository(storage: storage),
       answerRecordRepository: answerRecordRepository ??
           InMemoryAnswerRecordRepository(storage: answerStorage),
-      wordLearningProgressRepository: wordLearningProgressRepository,
+      wordLearningProgressRepository: wordLearningProgressRepository ??
+          InMemoryWordLearningProgressRepository(storage: progressStorage),
       wordBookRepository:
           wordBookRepository ?? const InMemoryWordBookRepository(),
       learningWordBookSelectionRepository: selectionRepository,
