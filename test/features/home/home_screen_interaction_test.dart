@@ -519,6 +519,98 @@ mountain,高山
     expect(find.text('孩子总览'), findsWidgets);
   });
 
+  testWidgets('家长详情页点击错词进入该孩子专属错词复习题组', (tester) async {
+    final answerStorage = [
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'library',
+        practiceMode: PracticeMode.englishToChinese,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.meaning,
+      ),
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'neighbor',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 1, 8),
+        elapsedMilliseconds: 1400,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+      AnswerRecord(
+        childId: 'child-sister',
+        wordId: 'through',
+        practiceMode: PracticeMode.englishToChinese,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 9),
+        elapsedMilliseconds: 900,
+        weaknessType: AnswerWeaknessType.meaning,
+      ),
+    ];
+    final answerRepository = InMemoryAnswerRecordRepository(
+      storage: answerStorage,
+    );
+    final progressRepository = InMemoryWordLearningProgressRepository(
+      storage: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          masteryLevel: 0,
+          consecutiveMistakes: 2,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1),
+        ),
+      ],
+    );
+
+    await _pumpHome(
+      tester,
+      answerRecordRepository: answerRepository,
+      wordLearningProgressRepository: progressRepository,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_switch_identity')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('identity_parent')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home_tab_today')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('parent_child_card_child-brother')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('parent_mistake_word_library')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('安安错词复习'), findsOneWidget);
+    expect(find.text('错词 Boss'), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+    expect(find.text('收服真实错题'), findsOneWidget);
+
+    await tester.tap(find.text('邻居').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 / 2'), findsOneWidget);
+
+    await tester.tap(find.text('图书馆').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('下一题', skipOffstage: false));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一题'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('安安详情'), findsOneWidget);
+    expect(answerStorage.last.childId, 'child-brother');
+    expect(answerStorage.last.wordId, 'library');
+  });
+
   testWidgets('设置页可以选择默认学习词表并驱动新词热身', (tester) async {
     final selectionRepository = InMemoryLearningWordBookSelectionRepository();
     await _pumpHome(tester, selectionRepository: selectionRepository);

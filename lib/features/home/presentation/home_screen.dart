@@ -120,6 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isComplete = false;
   bool _isParentMode = false;
   String? _selectedParentDetailChildId;
+  String? _activeStudyChildId;
+  String? _activeStudySelectedWordBookId;
+  bool _activeStudyCompletesAdventure = true;
 
   @override
   void initState() {
@@ -194,26 +197,31 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyQuizScreen(
-                childId: currentChild.id,
+                childId: _activeStudyChildId ?? currentChild.id,
                 level: _activeLevel ?? _adventure.currentLevel,
                 answerRecordRepository: _answerRecordRepository,
                 wordLearningProgressRepository: _wordLearningProgressRepository,
                 wordBooks: _wordBookRepository.loadWordBooks(),
-                selectedWordBookId: _selectedWordBook?.id,
+                selectedWordBookId:
+                    _activeStudySelectedWordBookId ?? _selectedWordBook?.id,
                 pronunciationPlayer: _pronunciationPlayer,
                 onClose: () {
                   setState(() {
                     _isStudying = false;
+                    _clearActiveStudyOverride();
                   });
                 },
                 onComplete: () {
                   setState(() {
-                    _adventure = _planAdventureSnapshot(
-                      _sessionController.completeCurrentLevel(_adventure),
-                    );
-                    _adventureRepository.saveAdventure(_adventure);
+                    if (_activeStudyCompletesAdventure) {
+                      _adventure = _planAdventureSnapshot(
+                        _sessionController.completeCurrentLevel(_adventure),
+                      );
+                      _adventureRepository.saveAdventure(_adventure);
+                    }
                     _isStudying = false;
-                    _isComplete = true;
+                    _isComplete = _activeStudyCompletesAdventure;
+                    _clearActiveStudyOverride();
                   });
                 },
               ),
@@ -270,6 +278,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() {
                   _activeLevel = _adventure.currentLevel;
                   _isStudying = true;
+                  _activeStudyChildId = null;
+                  _activeStudySelectedWordBookId = null;
+                  _activeStudyCompletesAdventure = true;
                 });
               },
             ),
@@ -280,6 +291,9 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _activeLevel = level;
               _isStudying = true;
+              _activeStudyChildId = null;
+              _activeStudySelectedWordBookId = null;
+              _activeStudyCompletesAdventure = true;
             });
           },
         ),
@@ -312,6 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedSummary != null) {
       return _ParentChildDetailView(
         summary: selectedSummary,
+        onReviewMistakes: () => _startParentMistakeReview(selectedSummary!),
         onBack: () {
           setState(() {
             _selectedParentDetailChildId = null;
@@ -330,6 +345,38 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       onManageData: _openDataManagement,
     );
+  }
+
+  void _startParentMistakeReview(_ParentChildSummary summary) {
+    if (summary.mistakeWords.isEmpty) {
+      return;
+    }
+    setState(() {
+      _selectedParentDetailChildId = summary.child.id;
+      _activeLevel = AdventureLevel(
+        id: '${summary.child.id}-parent-mistake-review',
+        childId: summary.child.id,
+        date: DateTime.now(),
+        type: AdventureLevelType.mistakeBoss,
+        title: '${summary.child.name}错词复习',
+        subtitle: '${summary.mistakeWords.length} 题 · 专属错词',
+        status: AdventureLevelStatus.current,
+        questionCount: summary.mistakeWords.length,
+        reward: const AdventureReward(),
+      );
+      _activeStudyChildId = summary.child.id;
+      _activeStudySelectedWordBookId =
+          _selectedWordBookForChild(summary.child.id)?.id;
+      _activeStudyCompletesAdventure = false;
+      _isStudying = true;
+      _isComplete = false;
+    });
+  }
+
+  void _clearActiveStudyOverride() {
+    _activeStudyChildId = null;
+    _activeStudySelectedWordBookId = null;
+    _activeStudyCompletesAdventure = true;
   }
 
   WordBook? get _selectedWordBook {
@@ -373,6 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isStudying = false;
       _isComplete = false;
       _selectedParentDetailChildId = null;
+      _clearActiveStudyOverride();
       _adventure = _loadPlannedAdventure(
         childId: childId,
         referenceDate: DateTime.now(),
@@ -1236,10 +1284,12 @@ class _ParentChildSummaryCard extends StatelessWidget {
 class _ParentChildDetailView extends StatelessWidget {
   const _ParentChildDetailView({
     required this.summary,
+    required this.onReviewMistakes,
     required this.onBack,
   });
 
   final _ParentChildSummary summary;
+  final VoidCallback onReviewMistakes;
   final VoidCallback onBack;
 
   @override
@@ -1278,7 +1328,10 @@ class _ParentChildDetailView extends StatelessWidget {
         const SizedBox(height: 24),
         _TrendCard(points: summary.trendPoints),
         const SizedBox(height: 24),
-        _MistakeWordCard(mistakeWords: summary.mistakeWords),
+        _MistakeWordCard(
+          mistakeWords: summary.mistakeWords,
+          onReviewMistakes: onReviewMistakes,
+        ),
         const SizedBox(height: 24),
         _ReviewAdviceCard(advice: summary.reviewAdvice),
         const SizedBox(height: 24),
@@ -1355,9 +1408,13 @@ class _TrendColumn extends StatelessWidget {
 }
 
 class _MistakeWordCard extends StatelessWidget {
-  const _MistakeWordCard({required this.mistakeWords});
+  const _MistakeWordCard({
+    required this.mistakeWords,
+    required this.onReviewMistakes,
+  });
 
   final List<_MistakeWordSummary> mistakeWords;
+  final VoidCallback onReviewMistakes;
 
   @override
   Widget build(BuildContext context) {
@@ -1375,10 +1432,26 @@ class _MistakeWordCard extends StatelessWidget {
           : Column(
               children: [
                 for (final mistakeWord in mistakeWords) ...[
-                  _DetailRow(
-                    icon: Icons.warning_amber_rounded,
-                    iconColor: const Color(0xFFFF3B30),
-                    label: '${mistakeWord.spelling} · ${mistakeWord.count} 次',
+                  Material(
+                    key: ValueKey('parent_mistake_word_${mistakeWord.wordId}'),
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: onReviewMistakes,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: _DetailRow(
+                          icon: Icons.warning_amber_rounded,
+                          iconColor: const Color(0xFFFF3B30),
+                          label:
+                              '${mistakeWord.spelling} · ${mistakeWord.count} 次',
+                          trailing: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Color(0xFF2F856F),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   if (mistakeWord != mistakeWords.last)
                     const SizedBox(height: 10),
@@ -1507,11 +1580,13 @@ class _DetailRow extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.label,
+    this.trailing,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1529,6 +1604,10 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: 10),
+          trailing!,
+        ],
       ],
     );
   }
@@ -1588,10 +1667,12 @@ class _DailyAccuracyPoint {
 
 class _MistakeWordSummary {
   const _MistakeWordSummary({
+    required this.wordId,
     required this.spelling,
     required this.count,
   });
 
+  final String wordId;
   final String spelling;
   final int count;
 }
@@ -1795,6 +1876,7 @@ class _ParentChildSummary {
     final summaries = [
       for (final entry in mistakeCounts.entries)
         _MistakeWordSummary(
+          wordId: entry.key,
           spelling: _wordSpelling(wordId: entry.key, wordBook: wordBook),
           count: entry.value,
         ),
