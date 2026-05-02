@@ -11,6 +11,8 @@ enum _HomeTab {
   settings,
 }
 
+const _tabContentPadding = EdgeInsets.fromLTRB(18, 18, 18, 128);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -155,7 +157,7 @@ class _TodayTabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      padding: _tabContentPadding,
       children: [
         _Header(
           title: '词途',
@@ -709,7 +711,7 @@ class _QuestTabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      padding: _tabContentPadding,
       children: const [
         _Header(
           title: '闯关',
@@ -784,7 +786,7 @@ class _WordBookTabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      padding: _tabContentPadding,
       children: const [
         _Header(
           title: '词表',
@@ -906,7 +908,7 @@ class _SettingsTabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      padding: _tabContentPadding,
       children: [
         const _Header(
           title: '设置',
@@ -1531,6 +1533,7 @@ class _BottomTabBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
+        key: const ValueKey('home_tab_bar'),
         height: 78,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(

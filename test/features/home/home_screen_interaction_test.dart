@@ -75,6 +75,21 @@ void main() {
     expect(find.text('导入学习备份'), findsOneWidget);
     expect(find.text('内部代号：Word Quest'), findsOneWidget);
   });
+
+  testWidgets('词表页滚动到底部时内容不会被底部导航遮挡', (tester) async {
+    await _pumpHome(tester);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_word_book')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -420));
+    await tester.pumpAndSettle();
+
+    final libraryBottom = tester.getBottomLeft(find.text('library')).dy;
+    final tabBarTop =
+        tester.getTopLeft(find.byKey(const ValueKey('home_tab_bar'))).dy;
+
+    expect(libraryBottom, lessThan(tabBarTop - 12));
+  });
 }
 
 Future<void> _pumpHome(WidgetTester tester) async {
