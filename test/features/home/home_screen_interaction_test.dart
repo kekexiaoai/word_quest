@@ -331,6 +331,97 @@ mountain,高山
     expect(find.text('家长看板'), findsOneWidget);
   });
 
+  testWidgets('家长模式首页展示每个孩子的学习总览和备份入口', (tester) async {
+    final answerRepository = InMemoryAnswerRecordRepository(storage: [
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'library',
+        practiceMode: PracticeMode.englishToChinese,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.meaning,
+      ),
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'library',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 1, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+      AnswerRecord(
+        childId: 'child-sister',
+        wordId: 'neighbor',
+        practiceMode: PracticeMode.englishToChinese,
+        isCorrect: true,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 900,
+      ),
+    ]);
+    final progressRepository = InMemoryWordLearningProgressRepository(
+      storage: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'library',
+          masteryLevel: 1,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1),
+        ),
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          masteryLevel: 0,
+          consecutiveMistakes: 2,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1),
+        ),
+        WordLearningProgress(
+          childId: 'child-sister',
+          wordId: 'library',
+          masteryLevel: 3,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1),
+        ),
+      ],
+    );
+
+    await _pumpHome(
+      tester,
+      answerRecordRepository: answerRepository,
+      wordLearningProgressRepository: progressRepository,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_switch_identity')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('identity_parent')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home_tab_today')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('孩子总览'), findsWidgets);
+    expect(find.text('安安'), findsWidgets);
+    expect(find.text('宁宁'), findsWidgets);
+    expect(find.text('今日完成 44%'), findsOneWidget);
+    expect(find.text('近 7 日正确率 0%'), findsOneWidget);
+    expect(find.text('到期复习 1 个'), findsWidgets);
+    expect(find.text('高频错词 library'), findsOneWidget);
+    expect(find.text('今日完成 50%'), findsOneWidget);
+    expect(find.text('近 7 日正确率 100%'), findsOneWidget);
+    expect(find.text('导出 / 导入备份'), findsOneWidget);
+
+    await tester.tap(find.text('导出 / 导入备份'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('数据管理'), findsWidgets);
+    expect(find.text('导出备份'), findsOneWidget);
+  });
+
   testWidgets('设置页可以选择默认学习词表并驱动新词热身', (tester) async {
     final selectionRepository = InMemoryLearningWordBookSelectionRepository();
     await _pumpHome(tester, selectionRepository: selectionRepository);

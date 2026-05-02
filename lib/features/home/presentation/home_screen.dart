@@ -68,6 +68,13 @@ String _shortLevelTitle(AdventureLevelType type) {
   };
 }
 
+String _firstCharacter(String value) {
+  if (value.isEmpty) {
+    return '?';
+  }
+  return value.substring(0, 1);
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -250,17 +257,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTabContent(ChildDashboardSnapshot currentChild) {
     return switch (_selectedTab) {
-      _HomeTab.today => _TodayTabView(
-          currentChild: currentChild,
-          adventure: _adventure,
-          isParentMode: _isParentMode,
-          onContinue: () {
-            setState(() {
-              _activeLevel = _adventure.currentLevel;
-              _isStudying = true;
-            });
-          },
-        ),
+      _HomeTab.today => _isParentMode
+          ? _ParentDashboardTabView(
+              children: _dashboard.children,
+              summaries: _parentChildSummaries(),
+              onManageData: _openDataManagement,
+            )
+          : _TodayTabView(
+              currentChild: currentChild,
+              adventure: _adventure,
+              onContinue: () {
+                setState(() {
+                  _activeLevel = _adventure.currentLevel;
+                  _isStudying = true;
+                });
+              },
+            ),
       _HomeTab.quest => _QuestTabView(
           adventure: _adventure,
           canEnterLevel: _sessionController.canEnter,
@@ -500,19 +512,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return wordBooks.first;
   }
+
+  List<_ParentChildSummary> _parentChildSummaries() {
+    final referenceDate = DateTime.now();
+    return [
+      for (final child in _dashboard.children)
+        _ParentChildSummary.from(
+          child: child,
+          adventure: _loadPlannedAdventure(
+            childId: child.id,
+            referenceDate: referenceDate,
+          ),
+          answerRecords: _answerRecordRepository.loadRecords(childId: child.id),
+          learningProgresses:
+              _wordLearningProgressRepository.loadProgresses(childId: child.id),
+          wordBook: _selectedWordBookForChild(child.id),
+          referenceDate: referenceDate,
+        ),
+    ];
+  }
 }
 
 class _TodayTabView extends StatelessWidget {
   const _TodayTabView({
     required this.currentChild,
     required this.adventure,
-    required this.isParentMode,
     required this.onContinue,
   });
 
   final ChildDashboardSnapshot currentChild;
   final AdventureDashboardSnapshot adventure;
-  final bool isParentMode;
   final VoidCallback onContinue;
 
   @override
@@ -523,7 +552,7 @@ class _TodayTabView extends StatelessWidget {
         _Header(
           title: '词途',
           eyebrow: '每天一小步，单词走得稳',
-          trailing: _LearnerPill(name: isParentMode ? '家长' : currentChild.name),
+          trailing: _LearnerPill(name: currentChild.name),
         ),
         const SizedBox(height: 28),
         _TodayTaskCard(
@@ -922,6 +951,379 @@ class _LearnerPill extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ParentDashboardTabView extends StatelessWidget {
+  const _ParentDashboardTabView({
+    required this.children,
+    required this.summaries,
+    required this.onManageData,
+  });
+
+  final List<ChildDashboardSnapshot> children;
+  final List<_ParentChildSummary> summaries;
+  final VoidCallback onManageData;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: _tabContentPadding,
+      children: [
+        const _Header(
+          title: '家长看板',
+          eyebrow: '孩子总览',
+          trailing: _LearnerPill(name: '家长'),
+        ),
+        const SizedBox(height: 28),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                value: '${children.length}',
+                label: '孩子档案',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: '${summaries.fold<int>(
+                  0,
+                  (sum, summary) => sum + summary.dueReviewCount,
+                )}',
+                label: '到期复习',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _BackupEntryCard(onTap: onManageData),
+        const SizedBox(height: 24),
+        const _SectionTitle('孩子总览'),
+        const SizedBox(height: 14),
+        for (final summary in summaries) ...[
+          _ParentChildSummaryCard(summary: summary),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+}
+
+class _BackupEntryCard extends StatelessWidget {
+  const _BackupEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5F8EC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.backup_rounded,
+                  color: Color(0xFF2F856F),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '导出 / 导入备份',
+                      style: TextStyle(
+                        color: Color(0xFF111114),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '迁移设备或保存本地学习数据',
+                      style: TextStyle(
+                        color: Color(0xFF70727A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF9B9BA3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ParentChildSummaryCard extends StatelessWidget {
+  const _ParentChildSummaryCard({required this.summary});
+
+  final _ParentChildSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2F856F),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  _firstCharacter(summary.child.name),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary.child.name,
+                      style: const TextStyle(
+                        color: Color(0xFF111114),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      summary.child.gradeLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF70727A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _ProgressBubble(label: '${summary.completionPercent}%'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: summary.completion,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E2E8),
+              color: const Color(0xFF2F856F),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _CompactBadge(
+                label: '今日完成 ${summary.completionPercent}%',
+                icon: Icons.flag_rounded,
+                color: const Color(0xFF2F856F),
+                backgroundColor: const Color(0xFFE5F8EC),
+              ),
+              _CompactBadge(
+                label: '近 7 日正确率 ${summary.accuracyPercent}%',
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF5856D6),
+                backgroundColor: const Color(0xFFECEBFF),
+              ),
+              _CompactBadge(
+                label: '到期复习 ${summary.dueReviewCount} 个',
+                icon: Icons.schedule_rounded,
+                color: const Color(0xFFFF9500),
+                backgroundColor: const Color(0xFFFFF2D9),
+              ),
+              _CompactBadge(
+                label: '高频错词 ${summary.frequentMistakeLabel}',
+                icon: Icons.warning_amber_rounded,
+                color: const Color(0xFFFF3B30),
+                backgroundColor: const Color(0xFFFFE9E7),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParentChildSummary {
+  const _ParentChildSummary({
+    required this.child,
+    required this.completion,
+    required this.accuracyPercent,
+    required this.dueReviewCount,
+    required this.frequentMistakeLabel,
+  });
+
+  final ChildDashboardSnapshot child;
+  final double completion;
+  final int accuracyPercent;
+  final int dueReviewCount;
+  final String frequentMistakeLabel;
+
+  int get completionPercent {
+    return (completion * 100).round();
+  }
+
+  static _ParentChildSummary from({
+    required ChildDashboardSnapshot child,
+    required AdventureDashboardSnapshot adventure,
+    required List<AnswerRecord> answerRecords,
+    required List<WordLearningProgress> learningProgresses,
+    required WordBook? wordBook,
+    required DateTime referenceDate,
+  }) {
+    final studyMetrics = _TodayStudyMetrics.from(adventure);
+    final recentRecords = _recentRecords(answerRecords, referenceDate);
+
+    return _ParentChildSummary(
+      child: child,
+      completion: studyMetrics.progress,
+      accuracyPercent: _accuracyPercent(recentRecords),
+      dueReviewCount: _dueReviewCount(
+        learningProgresses: learningProgresses,
+        wordBook: wordBook,
+        referenceDate: referenceDate,
+      ),
+      frequentMistakeLabel: _frequentMistakeLabel(
+        answerRecords: recentRecords,
+        wordBook: wordBook,
+      ),
+    );
+  }
+
+  static List<AnswerRecord> _recentRecords(
+    List<AnswerRecord> answerRecords,
+    DateTime referenceDate,
+  ) {
+    final start = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    ).subtract(const Duration(days: 6));
+    return [
+      for (final record in answerRecords)
+        if (!record.answeredAt.isBefore(start)) record,
+    ];
+  }
+
+  static int _accuracyPercent(List<AnswerRecord> answerRecords) {
+    if (answerRecords.isEmpty) {
+      return 0;
+    }
+    final correctCount =
+        answerRecords.where((record) => record.isCorrect).length;
+    return ((correctCount / answerRecords.length) * 100).round();
+  }
+
+  static int _dueReviewCount({
+    required List<WordLearningProgress> learningProgresses,
+    required WordBook? wordBook,
+    required DateTime referenceDate,
+  }) {
+    if (wordBook == null) {
+      return 0;
+    }
+    final wordIds = {for (final word in wordBook.words) word.id};
+    final referenceDay = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
+    return learningProgresses.where((progress) {
+      if (!wordIds.contains(progress.wordId) ||
+          progress.consecutiveMistakes > 0) {
+        return false;
+      }
+      final nextReviewDay = DateTime(
+        progress.nextReviewAt.year,
+        progress.nextReviewAt.month,
+        progress.nextReviewAt.day,
+      );
+      return !nextReviewDay.isAfter(referenceDay);
+    }).length;
+  }
+
+  static String _frequentMistakeLabel({
+    required List<AnswerRecord> answerRecords,
+    required WordBook? wordBook,
+  }) {
+    final mistakeCounts = <String, int>{};
+    for (final record in answerRecords) {
+      if (record.isCorrect) {
+        continue;
+      }
+      mistakeCounts[record.wordId] = (mistakeCounts[record.wordId] ?? 0) + 1;
+    }
+    if (mistakeCounts.isEmpty) {
+      return '暂无';
+    }
+
+    final sortedEntries = mistakeCounts.entries.toList()
+      ..sort((a, b) {
+        final countCompare = b.value.compareTo(a.value);
+        if (countCompare != 0) {
+          return countCompare;
+        }
+        return a.key.compareTo(b.key);
+      });
+    final wordId = sortedEntries.first.key;
+    return _wordSpelling(wordId: wordId, wordBook: wordBook);
+  }
+
+  static String _wordSpelling({
+    required String wordId,
+    required WordBook? wordBook,
+  }) {
+    if (wordBook == null) {
+      return wordId;
+    }
+    for (final word in wordBook.words) {
+      if (word.id == wordId) {
+        return word.spelling;
+      }
+    }
+    return wordId;
   }
 }
 
@@ -2149,13 +2551,6 @@ class _SettingsTabView extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  String _firstCharacter(String value) {
-    if (value.isEmpty) {
-      return '?';
-    }
-    return value.substring(0, 1);
   }
 }
 
