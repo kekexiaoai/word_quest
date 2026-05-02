@@ -13,10 +13,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('听音训练'), findsOneWidget);
-    expect(find.text('6 / 18'), findsOneWidget);
+    expect(find.text('1 / 6'), findsOneWidget);
     expect(find.text('听发音，选择对应单词'), findsOneWidget);
     expect(find.text('neighbor'), findsOneWidget);
-    expect(find.text('library'), findsOneWidget);
+    expect(find.text('library'), findsWidgets);
     expect(find.text('through'), findsOneWidget);
 
     await tester.tap(find.text('through'));
@@ -113,6 +113,35 @@ void main() {
     expect(find.text('复习探索关'), findsOneWidget);
     expect(find.text('6 题 · 选择 / 拼写 / 听音'), findsOneWidget);
     expect(find.text('听发音，选择对应单词'), findsOneWidget);
+  });
+
+  testWidgets('不同关卡进入后显示对应题组', (tester) async {
+    await _pumpHome(tester);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_quest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新词热身关'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('新词热身关'), findsOneWidget);
+    expect(find.text('新词热身'), findsOneWidget);
+    expect(find.text('1 / 8'), findsOneWidget);
+    expect(find.text('看单词，选择中文意思'), findsOneWidget);
+    expect(find.text('library'), findsWidgets);
+    expect(find.text('图书馆'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home_tab_quest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('复习探索关'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('复习探索关'), findsOneWidget);
+    expect(find.text('听音训练'), findsOneWidget);
+    expect(find.text('1 / 6'), findsOneWidget);
+    expect(find.text('听发音，选择对应单词'), findsOneWidget);
+    expect(find.text('through'), findsWidgets);
   });
 
   testWidgets('完成当前关卡后可以喂食宠物并更新首页状态', (tester) async {

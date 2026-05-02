@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../adventure/application/in_memory_adventure_repository.dart';
+import '../../adventure/application/adventure_level_quiz_builder.dart';
 import '../../adventure/application/adventure_session_controller.dart';
+import '../../adventure/application/in_memory_adventure_repository.dart';
 import '../../adventure/domain/adventure_dashboard_snapshot.dart';
 import '../../adventure/domain/adventure_level.dart';
+import '../../adventure/domain/adventure_level_quiz.dart';
 import '../../adventure/domain/adventure_repository.dart';
 import '../../adventure/domain/pet_profile.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
@@ -1426,6 +1428,8 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final quiz = const AdventureLevelQuizBuilder().buildForLevel(widget.level);
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       children: [
@@ -1447,9 +1451,9 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    '6 / 18',
-                    style: TextStyle(
+                  Text(
+                    quiz.progressLabel,
+                    style: const TextStyle(
                       color: Color(0xFF70727A),
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -1467,11 +1471,11 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
         const SizedBox(height: 28),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
-          child: const LinearProgressIndicator(
-            value: 6 / 18,
+          child: LinearProgressIndicator(
+            value: quiz.progressValue,
             minHeight: 8,
-            backgroundColor: Color(0xFFE2E2E8),
-            color: Color(0xFF2F856F),
+            backgroundColor: const Color(0xFFE2E2E8),
+            color: const Color(0xFF2F856F),
           ),
         ),
         const SizedBox(height: 28),
@@ -1481,39 +1485,32 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
           ),
-          child: const Column(
+          child: Column(
             children: [
               Text(
-                '听音训练',
-                style: TextStyle(
+                quiz.activityTitle,
+                style: const TextStyle(
                   color: Color(0xFF2F856F),
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                '听发音，选择对应单词',
-                style: TextStyle(
+                quiz.instruction,
+                style: const TextStyle(
                   color: Color(0xFF70727A),
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              SizedBox(height: 28),
-              CircleAvatar(
-                radius: 48,
-                backgroundColor: Color(0xFFE5F3EE),
-                child: Icon(
-                  Icons.volume_up_rounded,
-                  color: Color(0xFF2F856F),
-                  size: 54,
-                ),
-              ),
-              SizedBox(height: 24),
+              const SizedBox(height: 28),
+              _QuestionPrompt(quiz: quiz),
+              const SizedBox(height: 24),
               Text(
-                '可重复播放 2 次',
-                style: TextStyle(
+                quiz.usesAudioPrompt ? '可重复播放 2 次' : quiz.prompt,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
                   color: Color(0xFF9B9BA3),
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -1525,11 +1522,11 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
         const SizedBox(height: 22),
         _LevelContextPanel(level: widget.level),
         const SizedBox(height: 16),
-        for (final answer in const ['neighbor', 'library', 'through']) ...[
+        for (final answer in quiz.choices) ...[
           _ChoiceTile(
             label: answer,
             isSelected: _selectedAnswer == answer,
-            isCorrect: answer == 'through',
+            isCorrect: answer == quiz.correctAnswer,
             showFeedback: _showFeedback,
             onTap: () {
               setState(() {
@@ -1541,7 +1538,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           const SizedBox(height: 12),
         ],
         if (_showFeedback)
-          const _AnswerFeedbackPanel()
+          _AnswerFeedbackPanel(quiz: quiz)
         else
           const SizedBox(height: 102),
         const SizedBox(height: 18),
@@ -1564,6 +1561,46 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuestionPrompt extends StatelessWidget {
+  const _QuestionPrompt({required this.quiz});
+
+  final AdventureLevelQuiz quiz;
+
+  @override
+  Widget build(BuildContext context) {
+    if (quiz.usesAudioPrompt) {
+      return const CircleAvatar(
+        radius: 48,
+        backgroundColor: Color(0xFFE5F3EE),
+        child: Icon(
+          Icons.volume_up_rounded,
+          color: Color(0xFF2F856F),
+          size: 54,
+        ),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 96),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE5F3EE),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Text(
+        quiz.prompt,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Color(0xFF2F856F),
+          fontSize: 32,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
@@ -1671,7 +1708,9 @@ class _LevelContextPanel extends StatelessWidget {
 }
 
 class _AnswerFeedbackPanel extends StatelessWidget {
-  const _AnswerFeedbackPanel();
+  const _AnswerFeedbackPanel({required this.quiz});
+
+  final AdventureLevelQuiz quiz;
 
   @override
   Widget build(BuildContext context) {
@@ -1681,21 +1720,21 @@ class _AnswerFeedbackPanel extends StatelessWidget {
         color: const Color(0xFFE5F8EC),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '答对了',
-            style: TextStyle(
+            quiz.successTitle,
+            style: const TextStyle(
               color: Color(0xFF34C759),
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            'through 表示穿过，也可表示从头到尾完成。',
-            style: TextStyle(
+            quiz.explanation,
+            style: const TextStyle(
               color: Color(0xFF70727A),
               fontSize: 16,
               height: 1.35,
