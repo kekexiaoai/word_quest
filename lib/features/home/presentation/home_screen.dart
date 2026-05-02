@@ -8,6 +8,8 @@ import '../../adventure/domain/adventure_level.dart';
 import '../../adventure/domain/adventure_level_quiz.dart';
 import '../../adventure/domain/adventure_repository.dart';
 import '../../adventure/domain/pet_profile.dart';
+import '../../backup/application/backup_package_codec.dart';
+import '../../backup/application/local_data_backup_service.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
@@ -234,8 +236,28 @@ class _HomeScreenState extends State<HomeScreen> {
           wordBooks: _wordBookRepository.loadWordBooks(),
           onImportCsv: _importWordBookFromCsv,
         ),
-      _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
+      _HomeTab.settings => _SettingsTabView(
+          currentChild: currentChild,
+          onManageData: _openDataManagement,
+        ),
     };
+  }
+
+  Future<void> _openDataManagement() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _DataManagementDialog(
+        service: LocalDataBackupService(
+          wordBookRepository: _wordBookRepository,
+          answerRecordRepository: _answerRecordRepository,
+        ),
+        onDataChanged: () {
+          if (mounted) {
+            setState(() {});
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _importWordBookFromCsv() async {
@@ -999,6 +1021,7 @@ class _GroupedList extends StatelessWidget {
 
 class _RouteRow extends StatelessWidget {
   const _RouteRow({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.iconBackground,
@@ -1478,10 +1501,171 @@ class _CsvImportDialogState extends State<_CsvImportDialog> {
   }
 }
 
+class _DataManagementDialog extends StatelessWidget {
+  const _DataManagementDialog({
+    required this.service,
+    required this.onDataChanged,
+  });
+
+  final LocalDataBackupService service;
+  final VoidCallback onDataChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('数据管理'),
+      content: const SizedBox(
+        width: 360,
+        child: Text('管理本地导入词表与学习记录，可用于迁移设备或重新开始练习。'),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('data_clear_records_button'),
+          onPressed: () {
+            service.clearLearningRecords();
+            onDataChanged();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已清空本地学习记录')),
+            );
+          },
+          child: const Text('清空学习记录'),
+        ),
+        TextButton(
+          key: const ValueKey('data_import_button'),
+          onPressed: () => _showImportDialog(context),
+          child: const Text('导入备份'),
+        ),
+        FilledButton(
+          key: const ValueKey('data_export_button'),
+          onPressed: () {
+            final backupJson = service.exportBackup();
+            Navigator.of(context).pop();
+            showDialog<void>(
+              context: context,
+              builder: (context) => _BackupExportDialog(backupJson: backupJson),
+            );
+          },
+          child: const Text('导出备份'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showImportDialog(BuildContext context) async {
+    final jsonText = await showDialog<String>(
+      context: context,
+      builder: (context) => const _BackupImportDialog(),
+    );
+    if (jsonText == null) {
+      return;
+    }
+
+    try {
+      service.importBackup(jsonText);
+      onDataChanged();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('备份已导入')),
+        );
+      }
+    } on BackupPackageFormatException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    }
+  }
+}
+
+class _BackupExportDialog extends StatelessWidget {
+  const _BackupExportDialog({required this.backupJson});
+
+  final String backupJson;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('导出备份'),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: SelectableText(backupJson),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackupImportDialog extends StatefulWidget {
+  const _BackupImportDialog();
+
+  @override
+  State<_BackupImportDialog> createState() => _BackupImportDialogState();
+}
+
+class _BackupImportDialogState extends State<_BackupImportDialog> {
+  late final TextEditingController _jsonController;
+
+  @override
+  void initState() {
+    super.initState();
+    _jsonController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _jsonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('导入备份'),
+      content: SizedBox(
+        width: 360,
+        child: TextField(
+          key: const ValueKey('data_import_json_input'),
+          controller: _jsonController,
+          minLines: 10,
+          maxLines: 14,
+          decoration: const InputDecoration(
+            alignLabelWithHint: true,
+            labelText: '备份 JSON',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const ValueKey('data_import_submit'),
+          onPressed: () => Navigator.of(context).pop(_jsonController.text),
+          child: const Text('导入'),
+        ),
+      ],
+    );
+  }
+}
+
 class _SettingsTabView extends StatelessWidget {
-  const _SettingsTabView({required this.currentChild});
+  const _SettingsTabView({
+    required this.currentChild,
+    required this.onManageData,
+  });
 
   final ChildDashboardSnapshot currentChild;
+  final VoidCallback onManageData;
 
   @override
   Widget build(BuildContext context) {
@@ -1519,16 +1703,18 @@ class _SettingsTabView extends StatelessWidget {
         const SizedBox(height: 28),
         const _SectionTitle('数据'),
         const SizedBox(height: 14),
-        const _GroupedList(
+        _GroupedList(
           children: [
             _RouteRow(
               icon: Icons.backup_rounded,
-              iconColor: Color(0xFF2F856F),
-              iconBackground: Color(0xFFE5F8EC),
-              title: '备份与恢复',
-              subtitle: '本机',
+              iconColor: const Color(0xFF2F856F),
+              iconBackground: const Color(0xFFE5F8EC),
+              title: '数据管理',
+              subtitle: '导出 / 导入 / 清空学习记录',
+              onTap: onManageData,
+              key: const ValueKey('settings_data_management'),
             ),
-            _RouteRow(
+            const _RouteRow(
               icon: Icons.download_rounded,
               iconColor: Color(0xFFFF9500),
               iconBackground: Color(0xFFFFF2D9),

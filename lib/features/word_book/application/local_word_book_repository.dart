@@ -32,6 +32,11 @@ class LocalWordBookRepository implements WordBookRepository {
   }
 
   @override
+  List<WordBook> loadImportedWordBooks() {
+    return _loadImportedWordBooks();
+  }
+
+  @override
   void saveImportedWordBook(WordBook wordBook) {
     final importedWordBooks = _loadImportedWordBooks();
     importedWordBooks.removeWhere((book) => book.id == wordBook.id);
@@ -41,6 +46,16 @@ class LocalWordBookRepository implements WordBookRepository {
       jsonEncode([
         for (final importedWordBook in importedWordBooks)
           _wordBookToJson(importedWordBook),
+      ]),
+    );
+  }
+
+  @override
+  void replaceImportedWordBooks(List<WordBook> wordBooks) {
+    _store.write(
+      _storageKey,
+      jsonEncode([
+        for (final wordBook in wordBooks) _wordBookToJson(wordBook),
       ]),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/backup/application/backup_package_codec.dart';
 import 'package:word_quest/features/backup/domain/backup_package.dart';
 import 'package:word_quest/features/child_profile/domain/child_profile.dart';
+import 'package:word_quest/features/study/domain/answer_record.dart';
+import 'package:word_quest/features/study/domain/study_task.dart';
 import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
@@ -41,6 +43,17 @@ void main() {
             ],
           ),
         ],
+        answerRecords: [
+          AnswerRecord(
+            childId: 'child-a',
+            wordId: 'word-a',
+            practiceMode: PracticeMode.listeningChoice,
+            isCorrect: false,
+            answeredAt: DateTime(2026, 5, 2, 9, 35),
+            elapsedMilliseconds: 1400,
+            weaknessType: AnswerWeaknessType.listening,
+          ),
+        ],
       );
 
       final jsonText = codec.encode(package);
@@ -51,6 +64,9 @@ void main() {
       expect(decoded.children.single.name, '哥哥');
       expect(decoded.wordBooks.single.words.single.spelling, 'apple');
       expect(decoded.wordBooks.single.words.single.tags, ['水果']);
+      expect(decoded.answerRecords.single.wordId, 'word-a');
+      expect(decoded.answerRecords.single.weaknessType,
+          AnswerWeaknessType.listening);
     });
 
     test('拒绝不支持的备份版本', () {

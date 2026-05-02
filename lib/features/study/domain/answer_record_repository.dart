@@ -6,4 +6,10 @@ abstract class AnswerRecordRepository {
   void addRecord(AnswerRecord record);
 
   List<AnswerRecord> loadRecords({required String childId});
+
+  List<AnswerRecord> loadAllRecords();
+
+  void replaceRecords(List<AnswerRecord> records);
+
+  void clearRecords();
 }

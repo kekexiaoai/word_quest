@@ -26,4 +26,21 @@ class InMemoryAnswerRecordRepository implements AnswerRecordRepository {
         if (record.childId == childId) record,
     ];
   }
+
+  @override
+  List<AnswerRecord> loadAllRecords() {
+    return List<AnswerRecord>.of(_activeStorage);
+  }
+
+  @override
+  void replaceRecords(List<AnswerRecord> records) {
+    _activeStorage
+      ..clear()
+      ..addAll(records);
+  }
+
+  @override
+  void clearRecords() {
+    _activeStorage.clear();
+  }
 }

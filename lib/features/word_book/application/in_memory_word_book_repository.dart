@@ -51,9 +51,21 @@ class InMemoryWordBookRepository implements WordBookRepository {
   }
 
   @override
+  List<WordBook> loadImportedWordBooks() {
+    return List<WordBook>.of(_activeImportedWordBooks);
+  }
+
+  @override
   void saveImportedWordBook(WordBook wordBook) {
     _activeImportedWordBooks.removeWhere((book) => book.id == wordBook.id);
     _activeImportedWordBooks.add(wordBook);
+  }
+
+  @override
+  void replaceImportedWordBooks(List<WordBook> wordBooks) {
+    _activeImportedWordBooks
+      ..clear()
+      ..addAll(wordBooks);
   }
 
   List<WordEntry> _words(String prefix, int count) {

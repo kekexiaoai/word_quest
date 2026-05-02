@@ -33,6 +33,26 @@ class LocalAnswerRecordRepository implements AnswerRecordRepository {
     ];
   }
 
+  @override
+  List<AnswerRecord> loadAllRecords() {
+    return _loadAllRecords();
+  }
+
+  @override
+  void replaceRecords(List<AnswerRecord> records) {
+    _store.write(
+      _storageKey,
+      jsonEncode([
+        for (final item in records) _recordToJson(item),
+      ]),
+    );
+  }
+
+  @override
+  void clearRecords() {
+    _store.remove(_storageKey);
+  }
+
   List<AnswerRecord> _loadAllRecords() {
     final jsonText = _store.read(_storageKey);
     if (jsonText == null || jsonText.trim().isEmpty) {

@@ -318,6 +318,71 @@ mountain,高山
     expect(find.text('内部代号：Word Quest'), findsOneWidget);
   });
 
+  testWidgets('设置页数据管理支持导出导入和清空学习记录', (tester) async {
+    final answerStorage = <AnswerRecord>[
+      AnswerRecord(
+        childId: 'child-brother',
+        wordId: 'library',
+        practiceMode: PracticeMode.listeningChoice,
+        isCorrect: false,
+        answeredAt: DateTime(2026, 5, 2, 8),
+        elapsedMilliseconds: 1200,
+        weaknessType: AnswerWeaknessType.listening,
+      ),
+    ];
+    final importedWordBooks = <WordBook>[
+      const WordBook(
+        id: 'custom',
+        name: '我的导入词表',
+        stageLabel: '自定义',
+        words: [
+          WordEntry(id: 'custom-ocean', spelling: 'ocean', meanings: ['海洋']),
+        ],
+      ),
+    ];
+    await _pumpHome(
+      tester,
+      answerRecordRepository:
+          InMemoryAnswerRecordRepository(storage: answerStorage),
+      wordBookRepository:
+          InMemoryWordBookRepository(importedWordBooks: importedWordBooks),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_data_management')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('数据管理'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('data_export_button')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('"answerRecords"'), findsOneWidget);
+    expect(find.textContaining('我的导入词表'), findsOneWidget);
+
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings_data_management')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('data_clear_records_button')));
+    await tester.pumpAndSettle();
+
+    expect(answerStorage, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('data_import_button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('data_import_json_input')),
+      '''
+{"schemaVersion":1,"exportedAt":"2026-05-02T21:00:00.000","children":[],"wordBooks":[{"id":"restored","name":"恢复词表","stageLabel":"自定义","isBuiltIn":false,"words":[{"id":"restored-1","spelling":"river","meanings":["河流"],"tags":[]}]}],"answerRecords":[{"childId":"child-brother","wordId":"restored-1","practiceMode":"listeningChoice","isCorrect":false,"answeredAt":"2026-05-02T20:00:00.000","elapsedMilliseconds":1000,"weaknessType":"listening"}]}
+''',
+    );
+    await tester.tap(find.byKey(const ValueKey('data_import_submit')));
+    await tester.pumpAndSettle();
+
+    expect(importedWordBooks.single.name, '恢复词表');
+    expect(answerStorage.single.wordId, 'restored-1');
+  });
+
   testWidgets('闯关页当前关卡可以进入，锁定关卡不能进入', (tester) async {
     await _pumpHome(tester);
 

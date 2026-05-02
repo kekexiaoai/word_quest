@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import '../../child_profile/domain/child_profile.dart';
+import '../../study/domain/answer_record.dart';
+import '../../study/domain/study_task.dart';
 import '../../word_book/domain/word_book.dart';
 import '../../word_book/domain/word_entry.dart';
 import '../domain/backup_package.dart';
@@ -51,6 +53,10 @@ class BackupPackageCodec {
         for (final item in _requiredList(decoded, 'wordBooks'))
           _wordBookFromJson(_asMap(item, 'wordBooks')),
       ],
+      answerRecords: [
+        for (final item in _optionalList(decoded, 'answerRecords'))
+          _answerRecordFromJson(_asMap(item, 'answerRecords')),
+      ],
     );
   }
 
@@ -63,6 +69,9 @@ class BackupPackageCodec {
       ],
       'wordBooks': [
         for (final wordBook in package.wordBooks) _wordBookToJson(wordBook),
+      ],
+      'answerRecords': [
+        for (final record in package.answerRecords) _answerRecordToJson(record),
       ],
     };
   }
@@ -140,6 +149,33 @@ class BackupPackageCodec {
     );
   }
 
+  Map<String, Object?> _answerRecordToJson(AnswerRecord record) {
+    return {
+      'childId': record.childId,
+      'wordId': record.wordId,
+      'practiceMode': record.practiceMode.name,
+      'isCorrect': record.isCorrect,
+      'answeredAt': record.answeredAt.toIso8601String(),
+      'elapsedMilliseconds': record.elapsedMilliseconds,
+      'weaknessType': record.weaknessType?.name,
+    };
+  }
+
+  AnswerRecord _answerRecordFromJson(Map<String, dynamic> json) {
+    return AnswerRecord(
+      childId: _requiredString(json, 'childId'),
+      wordId: _requiredString(json, 'wordId'),
+      practiceMode: _practiceModeFromName(
+        _requiredString(json, 'practiceMode'),
+      ),
+      isCorrect: _requiredBool(json, 'isCorrect'),
+      answeredAt: _requiredDateTime(json, 'answeredAt'),
+      elapsedMilliseconds: _requiredInt(json, 'elapsedMilliseconds'),
+      weaknessType:
+          _weaknessTypeFromName(_optionalString(json, 'weaknessType')),
+    );
+  }
+
   String _requiredString(Map<String, dynamic> json, String field) {
     final value = json[field];
     if (value is String && value.trim().isNotEmpty) {
@@ -178,6 +214,14 @@ class BackupPackageCodec {
     throw BackupPackageFormatException('字段 $field 必须是布尔值');
   }
 
+  bool _requiredBool(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value is bool) {
+      return value;
+    }
+    throw BackupPackageFormatException('字段 $field 必须是布尔值');
+  }
+
   DateTime _requiredDateTime(Map<String, dynamic> json, String field) {
     final value = _requiredString(json, field);
     return _parseDateTime(value, field);
@@ -198,6 +242,17 @@ class BackupPackageCodec {
 
   List<dynamic> _requiredList(Map<String, dynamic> json, String field) {
     final value = json[field];
+    if (value is List) {
+      return value;
+    }
+    throw BackupPackageFormatException('字段 $field 必须是列表');
+  }
+
+  List<dynamic> _optionalList(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value == null) {
+      return [];
+    }
     if (value is List) {
       return value;
     }
@@ -237,5 +292,26 @@ class BackupPackageCodec {
       return value;
     }
     throw BackupPackageFormatException('字段 $field 的元素必须是对象');
+  }
+
+  PracticeMode _practiceModeFromName(String name) {
+    for (final mode in PracticeMode.values) {
+      if (mode.name == name) {
+        return mode;
+      }
+    }
+    throw BackupPackageFormatException('字段 practiceMode 不支持：$name');
+  }
+
+  AnswerWeaknessType? _weaknessTypeFromName(String? name) {
+    if (name == null) {
+      return null;
+    }
+    for (final weaknessType in AnswerWeaknessType.values) {
+      if (weaknessType.name == name) {
+        return weaknessType;
+      }
+    }
+    throw BackupPackageFormatException('字段 weaknessType 不支持：$name');
   }
 }
