@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HomeDashboardSnapshot _dashboard;
   _HomeTab _selectedTab = _HomeTab.today;
   bool _isStudying = false;
+  bool _isComplete = false;
 
   @override
   void initState() {
@@ -40,6 +41,34 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final currentChild = _dashboard.children.first;
 
+    if (_isComplete) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF2F2F7),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: _StudyCompleteScreen(
+                onBackToday: () {
+                  setState(() {
+                    _isStudying = false;
+                    _isComplete = false;
+                    _selectedTab = _HomeTab.today;
+                  });
+                },
+                onReview: () {
+                  setState(() {
+                    _isComplete = false;
+                    _selectedTab = _HomeTab.wordBook;
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_isStudying) {
       return Scaffold(
         backgroundColor: const Color(0xFFF2F2F7),
@@ -51,6 +80,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 onClose: () {
                   setState(() {
                     _isStudying = false;
+                  });
+                },
+                onComplete: () {
+                  setState(() {
+                    _isStudying = false;
+                    _isComplete = true;
                   });
                 },
               ),
@@ -102,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       _HomeTab.quest => const _QuestTabView(),
-      _HomeTab.wordBook => _WordBookTabView(rows: _dashboard.bookHighlights),
+      _HomeTab.wordBook => const _WordBookTabView(),
       _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
     };
   }
@@ -122,16 +157,54 @@ class _TodayTabView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       children: [
-        const _Header(title: '今天', eyebrow: 'Word Quest'),
+        _Header(
+          title: '词途',
+          eyebrow: '每天一小步，单词走得稳',
+          trailing: _LearnerPill(name: currentChild.name),
+        ),
         const SizedBox(height: 28),
         _TodayTaskCard(
           child: currentChild,
           onContinue: onContinue,
         ),
         const SizedBox(height: 28),
-        const _SectionTitle('学习路线'),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                value: currentChild.accuracyLabel,
+                label: '近 7 日正确率',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: currentChild.streakLabel.replaceAll('连续 ', ''),
+                label: '连续学习',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        const _SectionTitle('接下来'),
         const SizedBox(height: 14),
-        const _LearningRouteList(),
+        const _SingleActionCard(
+          icon: Icons.volume_up_rounded,
+          iconColor: Color(0xFF5856D6),
+          iconBackground: Color(0xFFECEBFF),
+          title: '听音训练',
+          subtitle: '4 题 · 约 3 分钟',
+        ),
+        const SizedBox(height: 28),
+        const _SectionTitle('需要留意'),
+        const SizedBox(height: 14),
+        const _SingleActionCard(
+          icon: Icons.edit_outlined,
+          iconColor: Color(0xFFFF9500),
+          iconBackground: Color(0xFFFFF2D9),
+          title: 'through 拼写仍不稳',
+          subtitle: '已放入今天的错词复习',
+        ),
       ],
     );
   }
@@ -142,11 +215,13 @@ class _Header extends StatelessWidget {
     required this.title,
     required this.eyebrow,
     this.trailingIcon = Icons.person_outline_rounded,
+    this.trailing,
   });
 
   final String title;
   final String eyebrow;
   final IconData trailingIcon;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -175,20 +250,60 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          width: 58,
-          height: 58,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            trailingIcon,
-            color: const Color(0xFF007AFF),
-            size: 30,
-          ),
-        ),
+        trailing ??
+            Container(
+              width: 58,
+              height: 58,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                trailingIcon,
+                color: const Color(0xFF2F856F),
+                size: 30,
+              ),
+            ),
       ],
+    );
+  }
+}
+
+class _LearnerPill extends StatelessWidget {
+  const _LearnerPill({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2F856F),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -205,10 +320,9 @@ class _TodayTaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progressPercent = (child.progress * 100).round();
-    final questionCount = _questionCount(child.taskSummary);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
@@ -219,11 +333,11 @@ class _TodayTaskCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '今日任务',
                       style: TextStyle(
                         color: Color(0xFF34C759),
@@ -231,19 +345,19 @@ class _TodayTaskCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Text(
-                      '$questionCount 道题 · 还差 5 分钟',
-                      style: const TextStyle(
+                      '12 分钟完成剩余练习',
+                      style: TextStyle(
                         color: Color(0xFF111114),
-                        fontSize: 32,
+                        fontSize: 30,
                         height: 1.12,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '新词、复习词和错词强化已按顺序排好。',
+                    SizedBox(height: 12),
+                    Text(
+                      '还剩 7 题，下一组是听音和错词复习。',
                       style: TextStyle(
                         color: Color(0xFF70727A),
                         fontSize: 16,
@@ -259,16 +373,26 @@ class _TodayTaskCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: child.progress,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E2E8),
+              color: const Color(0xFF2F856F),
+            ),
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 52,
+            height: 56,
             child: FilledButton.icon(
               key: const ValueKey('home_continue_learning_button'),
               onPressed: onContinue,
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('继续学习'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF007AFF),
+                backgroundColor: const Color(0xFF2F856F),
                 foregroundColor: Colors.white,
                 textStyle: const TextStyle(
                   fontSize: 19,
@@ -280,34 +404,9 @@ class _TodayTaskCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(
-                  value: child.accuracyLabel,
-                  label: '正确率',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MetricTile(
-                  value: child.streakLabel.replaceAll('连续 ', ''),
-                  label: '连续学习',
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
-  }
-
-  int _questionCount(String taskSummary) {
-    final matches = RegExp(r'\d+').allMatches(taskSummary);
-    return matches
-        .map((match) => int.tryParse(match.group(0) ?? '') ?? 0)
-        .fold(0, (sum, value) => sum + value);
   }
 }
 
@@ -329,7 +428,7 @@ class _ProgressBubble extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color: Color(0xFF34C759),
+          color: Color(0xFF2F856F),
           fontSize: 24,
           fontWeight: FontWeight.w900,
         ),
@@ -373,6 +472,67 @@ class _MetricTile extends StatelessWidget {
               color: Color(0xFF70727A),
               fontSize: 15,
               fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SingleActionCard extends StatelessWidget {
+  const _SingleActionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBackground,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackground;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          _IconBadge(
+            icon: icon,
+            iconColor: iconColor,
+            backgroundColor: iconBackground,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF111114),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF70727A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -429,28 +589,6 @@ class _LearningRouteList extends StatelessWidget {
           title: '听音训练',
           subtitle: '听音选词 / 听写 · 4 题',
         ),
-      ],
-    );
-  }
-}
-
-class _WordBookList extends StatelessWidget {
-  const _WordBookList({required this.rows});
-
-  final List<DashboardSectionLine> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    return _GroupedList(
-      children: [
-        for (final row in rows)
-          _RouteRow(
-            icon: Icons.menu_book_rounded,
-            iconColor: const Color(0xFF007AFF),
-            iconBackground: const Color(0xFFEAF3FF),
-            title: row.label,
-            subtitle: row.value,
-          ),
       ],
     );
   }
@@ -641,48 +779,121 @@ class _RewardPanel extends StatelessWidget {
 }
 
 class _WordBookTabView extends StatelessWidget {
-  const _WordBookTabView({required this.rows});
-
-  final List<DashboardSectionLine> rows;
+  const _WordBookTabView();
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-      children: [
-        const _Header(
-          title: '错词与词表',
-          eyebrow: '词表',
-          trailingIcon: Icons.search_rounded,
+      children: const [
+        _Header(
+          title: '词表',
+          eyebrow: '小学高年级基础词表',
+          trailingIcon: Icons.add_rounded,
         ),
-        const SizedBox(height: 28),
-        const _SectionTitle('高频错词'),
-        const SizedBox(height: 14),
-        const _GroupedList(
+        SizedBox(height: 28),
+        _SearchBox(label: '搜索单词、释义或标签'),
+        SizedBox(height: 28),
+        Row(
           children: [
-            _RouteRow(
-              icon: Icons.keyboard_rounded,
-              iconColor: Color(0xFFFF3B30),
-              iconBackground: Color(0xFFFFE5E5),
-              title: '拼写薄弱',
-              subtitle: 'neighbor / library / difficult',
-              status: '复习',
-              statusColor: Color(0xFFFF3B30),
+            Expanded(
+              child: _MetricTile(
+                value: '240',
+                label: '词表总量',
+              ),
             ),
-            _RouteRow(
-              icon: Icons.volume_up_rounded,
-              iconColor: Color(0xFFFF9500),
-              iconBackground: Color(0xFFFFF2D9),
-              title: '听音薄弱',
-              subtitle: '听写错词 · 4 个',
+            SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: '12',
+                label: '待复习错词',
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 28),
-        const _SectionTitle('内置词表'),
-        const SizedBox(height: 14),
-        _WordBookList(rows: rows),
+        SizedBox(height: 28),
+        _SectionTitle('分类'),
+        SizedBox(height: 14),
+        _GroupedList(
+          children: [
+            _RouteRow(
+              icon: Icons.layers_rounded,
+              iconColor: Color(0xFF2F856F),
+              iconBackground: Color(0xFFE5F8EC),
+              title: '当前词表',
+              subtitle: '小学高年级基础 · 掌握 126 个',
+            ),
+            _RouteRow(
+              icon: Icons.warning_amber_rounded,
+              iconColor: Color(0xFFFF9500),
+              iconBackground: Color(0xFFFFF2D9),
+              title: '错词复习',
+              subtitle: '拼写 6 个 · 听音 4 个 · 释义 2 个',
+            ),
+          ],
+        ),
+        SizedBox(height: 28),
+        _SectionTitle('最近练过'),
+        SizedBox(height: 14),
+        _GroupedList(
+          children: [
+            _RouteRow(
+              icon: Icons.abc_rounded,
+              iconColor: Color(0xFF111114),
+              iconBackground: Color(0xFFFFFFFF),
+              title: 'neighbor',
+              subtitle: '邻居 · 听音待复习',
+              status: '今天',
+              statusColor: Color(0xFFFF9500),
+            ),
+            _RouteRow(
+              icon: Icons.abc_rounded,
+              iconColor: Color(0xFF111114),
+              iconBackground: Color(0xFFFFFFFF),
+              title: 'library',
+              subtitle: '图书馆 · 已掌握',
+              status: '稳定',
+              statusColor: Color(0xFF2F856F),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _SearchBox extends StatelessWidget {
+  const _SearchBox({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E2E8),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF70727A),
+            size: 28,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF70727A),
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -699,76 +910,87 @@ class _SettingsTabView extends StatelessWidget {
       children: [
         const _Header(
           title: '设置',
-          eyebrow: '账号与角色',
-          trailingIcon: Icons.settings_outlined,
+          eyebrow: 'Word Quest',
+          trailing: SizedBox.shrink(),
         ),
         const SizedBox(height: 28),
-        const _SectionTitle('当前学习者'),
+        _ProfileCard(name: currentChild.name),
+        const SizedBox(height: 28),
+        const _SectionTitle('身份与档案'),
         const SizedBox(height: 14),
         _GroupedList(
           children: [
             _RouteRow(
-              icon: Icons.person_rounded,
-              iconColor: const Color(0xFF34C759),
+              icon: Icons.switch_account_rounded,
+              iconColor: const Color(0xFF2F856F),
               iconBackground: const Color(0xFFE5F8EC),
-              title: currentChild.name,
-              subtitle:
-                  '${currentChild.taskSummary} · 正确率 ${currentChild.accuracyLabel}',
-              status: '${(currentChild.progress * 100).round()}%',
-              statusColor: const Color(0xFF34C759),
+              title: '切换孩子 / 家长',
+              subtitle: currentChild.name,
             ),
             const _RouteRow(
-              icon: Icons.switch_account_rounded,
-              iconColor: Color(0xFF007AFF),
-              iconBackground: Color(0xFFE5F2FF),
-              title: '角色切换',
-              subtitle: '切换学习者或进入家长模式',
+              icon: Icons.shield_outlined,
+              iconColor: Color(0xFF5856D6),
+              iconBackground: Color(0xFFECEBFF),
+              title: '家长管理',
+              subtitle: '轻量看板',
             ),
           ],
         ),
         const SizedBox(height: 28),
-        const _SectionTitle('数据管理'),
+        const _SectionTitle('数据'),
         const SizedBox(height: 14),
         const _GroupedList(
           children: [
             _RouteRow(
-              icon: Icons.upload_rounded,
-              iconColor: Color(0xFF34C759),
+              icon: Icons.backup_rounded,
+              iconColor: Color(0xFF2F856F),
               iconBackground: Color(0xFFE5F8EC),
-              title: '导入 CSV 词表',
-              subtitle: '扩展自定义单词',
+              title: '备份与恢复',
+              subtitle: '本机',
             ),
             _RouteRow(
-              icon: Icons.backup_rounded,
-              iconColor: Color(0xFF5856D6),
-              iconBackground: Color(0xFFECEBFF),
-              title: '备份与恢复',
-              subtitle: '学习数据保存为 JSON 备份',
+              icon: Icons.download_rounded,
+              iconColor: Color(0xFFFF9500),
+              iconBackground: Color(0xFFFFF2D9),
+              title: '导入学习备份',
+              subtitle: 'JSON',
             ),
           ],
         ),
         const SizedBox(height: 28),
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: const Color(0xFFE5F8EC),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: const Row(
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                color: Color(0xFF34C759),
+              Text(
+                '词途',
+                style: TextStyle(
+                  color: Color(0xFF111114),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '学习数据保存在本机，可随时导出 JSON 备份。',
-                  style: TextStyle(
-                    color: Color(0xFF111114),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+              SizedBox(height: 14),
+              Text(
+                '每天一小步，单词走得稳',
+                style: TextStyle(
+                  color: Color(0xFF70727A),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '内部代号：Word Quest',
+                style: TextStyle(
+                  color: Color(0xFF9B9BA3),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -779,10 +1001,81 @@ class _SettingsTabView extends StatelessWidget {
   }
 }
 
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2F856F),
+              shape: BoxShape.circle,
+            ),
+            child: const Text(
+              '安',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Color(0xFF111114),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '孩子模式 · 五年级',
+                  style: TextStyle(
+                    color: Color(0xFF70727A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Color(0xFF9B9BA3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StudyQuizScreen extends StatefulWidget {
-  const _StudyQuizScreen({required this.onClose});
+  const _StudyQuizScreen({
+    required this.onClose,
+    required this.onComplete,
+  });
 
   final VoidCallback onClose;
+  final VoidCallback onComplete;
 
   @override
   State<_StudyQuizScreen> createState() => _StudyQuizScreenState();
@@ -807,7 +1100,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
               child: Column(
                 children: [
                   Text(
-                    '基础选择题',
+                    '听音训练',
                     style: TextStyle(
                       color: Color(0xFF111114),
                       fontSize: 20,
@@ -816,7 +1109,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    '第 1 / 18 题',
+                    '6 / 18',
                     style: TextStyle(
                       color: Color(0xFF70727A),
                       fontSize: 16,
@@ -836,15 +1129,15 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: const LinearProgressIndicator(
-            value: 1 / 18,
+            value: 6 / 18,
             minHeight: 8,
             backgroundColor: Color(0xFFE2E2E8),
-            color: Color(0xFF007AFF),
+            color: Color(0xFF2F856F),
           ),
         ),
         const SizedBox(height: 28),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 36),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 44),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
@@ -852,28 +1145,29 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           child: const Column(
             children: [
               Text(
-                '请选择中文释义',
+                '听发音，选择对应单词',
                 style: TextStyle(
                   color: Color(0xFF70727A),
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              SizedBox(height: 18),
-              Text(
-                'neighbor',
-                style: TextStyle(
-                  color: Color(0xFF111114),
-                  fontSize: 44,
-                  fontWeight: FontWeight.w900,
+              SizedBox(height: 28),
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Color(0xFFE5F3EE),
+                child: Icon(
+                  Icons.volume_up_rounded,
+                  color: Color(0xFF2F856F),
+                  size: 54,
                 ),
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 24),
               Text(
-                '/ˈneɪbər/',
+                '可重复播放 2 次',
                 style: TextStyle(
-                  color: Color(0xFF70727A),
-                  fontSize: 22,
+                  color: Color(0xFF9B9BA3),
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -881,11 +1175,11 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
           ),
         ),
         const SizedBox(height: 22),
-        for (final answer in const ['图书馆', '邻居', '穿过', '困难的']) ...[
+        for (final answer in const ['neighbor', 'library', 'through']) ...[
           _ChoiceTile(
             label: answer,
             isSelected: _selectedAnswer == answer,
-            isCorrect: answer == '邻居',
+            isCorrect: answer == 'through',
             showFeedback: _showFeedback,
             onTap: () {
               setState(() {
@@ -904,10 +1198,10 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
         SizedBox(
           height: 58,
           child: FilledButton(
-            onPressed: _showFeedback ? widget.onClose : null,
+            onPressed: _showFeedback ? widget.onComplete : null,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF007AFF),
-              disabledBackgroundColor: const Color(0xFFB7D7FF),
+              backgroundColor: const Color(0xFF2F856F),
+              disabledBackgroundColor: const Color(0xFFA8D4C6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
@@ -1013,7 +1307,7 @@ class _AnswerFeedbackPanel extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Text(
-            'neighbor 表示住在附近的人，也可以作动词表示邻近。',
+            'through 表示穿过，也可表示从头到尾完成。',
             style: TextStyle(
               color: Color(0xFF70727A),
               fontSize: 16,
@@ -1023,6 +1317,151 @@ class _AnswerFeedbackPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _StudyCompleteScreen extends StatelessWidget {
+  const _StudyCompleteScreen({
+    required this.onBackToday,
+    required this.onReview,
+  });
+
+  final VoidCallback onBackToday;
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      children: [
+        const SizedBox(height: 28),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 42),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: const Column(
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Color(0xFFFFF2D9),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Color(0xFFFF9500),
+                  size: 52,
+                ),
+              ),
+              SizedBox(height: 32),
+              Text(
+                '今天完成了',
+                style: TextStyle(
+                  color: Color(0xFF111114),
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 22),
+              Text(
+                '安安获得 3 颗星，森林书屋第 4 站已点亮。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF70727A),
+                  fontSize: 18,
+                  height: 1.35,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 26),
+        const Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                value: '18',
+                label: '完成',
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: '94%',
+                label: '正确率',
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _MetricTile(
+                value: '2',
+                label: '待复习',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        const _SectionTitle('明天优先复习'),
+        const SizedBox(height: 14),
+        const _GroupedList(
+          children: [
+            _RouteRow(
+              icon: Icons.edit_outlined,
+              iconColor: Color(0xFFFF9500),
+              iconBackground: Color(0xFFFFF2D9),
+              title: 'through',
+              subtitle: '拼写仍不稳定',
+            ),
+            _RouteRow(
+              icon: Icons.volume_up_rounded,
+              iconColor: Color(0xFF5856D6),
+              iconBackground: Color(0xFFECEBFF),
+              title: 'neighbor',
+              subtitle: '听音反应稍慢',
+            ),
+          ],
+        ),
+        const SizedBox(height: 120),
+        SizedBox(
+          height: 58,
+          child: FilledButton(
+            onPressed: onBackToday,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2F856F),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: const Text('回到今天'),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 58,
+          child: OutlinedButton(
+            onPressed: onReview,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF2F856F),
+              side: BorderSide.none,
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: const Text('马上复习错词'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1160,7 +1599,7 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? const Color(0xFF007AFF) : const Color(0xFF9B9BA3);
+    final color = isActive ? const Color(0xFF2F856F) : const Color(0xFF9B9BA3);
     return GestureDetector(
       key: tapKey,
       behavior: HitTestBehavior.opaque,
