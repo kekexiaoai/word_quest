@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:word_quest/core/local_storage/local_key_value_store.dart';
 import 'package:word_quest/features/adventure/application/adventure_session_controller.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
+import 'package:word_quest/features/adventure/application/local_adventure_repository.dart';
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/adventure/domain/adventure_level.dart';
 import 'package:word_quest/features/adventure/domain/pet_profile.dart';
@@ -76,5 +78,34 @@ void main() {
     expect(restored.pet.name, '豆豆');
     expect(restored.pet.level, 3);
     expect(restored.pet.satiety, 88);
+  });
+
+  test('本地冒险仓库保存后新实例仍可恢复关卡和宠物', () {
+    final store = MemoryLocalKeyValueStore();
+    final firstRepository = LocalAdventureRepository(store: store);
+    const controller = AdventureSessionController();
+    final snapshot = firstRepository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final completed = controller.completeCurrentLevel(snapshot);
+    final fed = controller.feedPetWithTodayRewards(
+      completed,
+      fedAt: DateTime(2026, 5, 2, 20),
+    );
+    firstRepository.saveAdventure(fed);
+
+    final secondRepository = LocalAdventureRepository(store: store);
+    final restored = secondRepository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    expect(restored.starsEarned, 3);
+    expect(restored.currentLevel.title, '错词 Boss 关');
+    expect(restored.pet.level, 3);
+    expect(restored.pet.satiety, 88);
+    expect(restored.pet.lastFedAt, DateTime(2026, 5, 2, 20));
   });
 }

@@ -5,6 +5,7 @@ import 'package:word_quest/features/adventure/application/in_memory_adventure_re
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
 import 'package:word_quest/features/home/presentation/home_screen.dart';
 import 'package:word_quest/features/study/application/in_memory_answer_record_repository.dart';
+import 'package:word_quest/features/study/application/pronunciation_player.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
 import 'package:word_quest/features/study/domain/study_task.dart';
 import 'package:word_quest/features/word_book/application/in_memory_word_book_repository.dart';
@@ -39,6 +40,19 @@ void main() {
 
     expect(find.text('2 / 6'), findsOneWidget);
     expect(find.text('今天完成了'), findsNothing);
+  });
+
+  testWidgets('点击听音按钮会播放当前题目发音', (tester) async {
+    final pronunciationPlayer = _FakePronunciationPlayer();
+    await _pumpHome(tester, pronunciationPlayer: pronunciationPlayer);
+
+    await tester
+        .tap(find.byKey(const ValueKey('home_continue_learning_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.volume_up_rounded).first);
+    await tester.pumpAndSettle();
+
+    expect(pronunciationPlayer.spokenTexts, ['through']);
   });
 
   testWidgets('答完当前关卡最后一题后才进入结算', (tester) async {
@@ -593,6 +607,7 @@ Future<void> _pumpHome(
   InMemoryAdventureRepository? adventureRepository,
   InMemoryAnswerRecordRepository? answerRecordRepository,
   InMemoryWordBookRepository? wordBookRepository,
+  PronunciationPlayer? pronunciationPlayer,
 }) async {
   tester.view.physicalSize = const Size(430, 932);
   tester.view.devicePixelRatio = 1;
@@ -609,6 +624,16 @@ Future<void> _pumpHome(
           InMemoryAnswerRecordRepository(storage: answerStorage),
       wordBookRepository:
           wordBookRepository ?? const InMemoryWordBookRepository(),
+      pronunciationPlayer: pronunciationPlayer,
     ),
   ));
+}
+
+class _FakePronunciationPlayer implements PronunciationPlayer {
+  final spokenTexts = <String>[];
+
+  @override
+  void speak(String text) {
+    spokenTexts.add(text);
+  }
 }

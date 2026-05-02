@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../adventure/application/adventure_level_quiz_builder.dart';
 import '../../adventure/application/adventure_session_controller.dart';
-import '../../adventure/application/in_memory_adventure_repository.dart';
+import '../../adventure/application/local_adventure_repository.dart';
 import '../../adventure/domain/adventure_dashboard_snapshot.dart';
 import '../../adventure/domain/adventure_level.dart';
 import '../../adventure/domain/adventure_level_quiz.dart';
@@ -15,6 +15,7 @@ import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
 import '../../study/application/local_answer_record_repository.dart';
+import '../../study/application/pronunciation_player.dart';
 import '../../study/application/study_answer_evaluator.dart';
 import '../../study/domain/answer_record.dart';
 import '../../study/domain/answer_record_repository.dart';
@@ -64,15 +65,17 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
-    this.adventureRepository = const InMemoryAdventureRepository(),
+    this.adventureRepository,
     this.answerRecordRepository,
     this.wordBookRepository,
+    this.pronunciationPlayer,
   });
 
   final HomeDashboardRepository dashboardRepository;
-  final AdventureRepository adventureRepository;
+  final AdventureRepository? adventureRepository;
   final AnswerRecordRepository? answerRecordRepository;
   final WordBookRepository? wordBookRepository;
+  final PronunciationPlayer? pronunciationPlayer;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -82,8 +85,10 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _sessionController = AdventureSessionController();
 
   late final HomeDashboardSnapshot _dashboard;
+  late final AdventureRepository _adventureRepository;
   late final AnswerRecordRepository _answerRecordRepository;
   late final WordBookRepository _wordBookRepository;
+  late final PronunciationPlayer _pronunciationPlayer;
   late AdventureDashboardSnapshot _adventure;
   AdventureLevel? _activeLevel;
   _HomeTab _selectedTab = _HomeTab.today;
@@ -93,15 +98,19 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _adventureRepository =
+        widget.adventureRepository ?? LocalAdventureRepository();
     _answerRecordRepository =
         widget.answerRecordRepository ?? LocalAnswerRecordRepository();
     _wordBookRepository =
         widget.wordBookRepository ?? LocalWordBookRepository();
+    _pronunciationPlayer =
+        widget.pronunciationPlayer ?? createDefaultPronunciationPlayer();
     final referenceDate = DateTime.now();
     _dashboard = widget.dashboardRepository.loadDashboard(
       referenceDate: referenceDate,
     );
-    _adventure = widget.adventureRepository.loadAdventure(
+    _adventure = _adventureRepository.loadAdventure(
       childId: _dashboard.children.first.id,
       referenceDate: referenceDate,
     );
@@ -126,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _adventure,
                       fedAt: DateTime.now(),
                     );
-                    widget.adventureRepository.saveAdventure(_adventure);
+                    _adventureRepository.saveAdventure(_adventure);
                     _isStudying = false;
                     _isComplete = false;
                     _selectedTab = _HomeTab.today;
@@ -157,6 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 level: _activeLevel ?? _adventure.currentLevel,
                 answerRecordRepository: _answerRecordRepository,
                 wordBooks: _wordBookRepository.loadWordBooks(),
+                pronunciationPlayer: _pronunciationPlayer,
                 onClose: () {
                   setState(() {
                     _isStudying = false;
@@ -166,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _adventure =
                         _sessionController.completeCurrentLevel(_adventure);
-                    widget.adventureRepository.saveAdventure(_adventure);
+                    _adventureRepository.saveAdventure(_adventure);
                     _isStudying = false;
                     _isComplete = true;
                   });
@@ -1905,6 +1915,7 @@ class _StudyQuizScreen extends StatefulWidget {
     required this.level,
     required this.answerRecordRepository,
     required this.wordBooks,
+    required this.pronunciationPlayer,
     required this.onClose,
     required this.onComplete,
   });
@@ -1913,6 +1924,7 @@ class _StudyQuizScreen extends StatefulWidget {
   final AdventureLevel level;
   final AnswerRecordRepository answerRecordRepository;
   final List<WordBook> wordBooks;
+  final PronunciationPlayer pronunciationPlayer;
   final VoidCallback onClose;
   final VoidCallback onComplete;
 
@@ -1987,7 +1999,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
             ),
             _CircleButton(
               icon: Icons.volume_up_rounded,
-              onTap: () {},
+              onTap: () => widget.pronunciationPlayer.speak(quiz.prompt),
             ),
           ],
         ),
@@ -2028,7 +2040,11 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              _QuestionPrompt(quiz: quiz),
+              _QuestionPrompt(
+                quiz: quiz,
+                onPlayPronunciation: () =>
+                    widget.pronunciationPlayer.speak(quiz.prompt),
+              ),
               const SizedBox(height: 24),
               Text(
                 quiz.usesAudioPrompt ? '可重复播放 2 次' : quiz.prompt,
@@ -2139,20 +2155,27 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
 }
 
 class _QuestionPrompt extends StatelessWidget {
-  const _QuestionPrompt({required this.quiz});
+  const _QuestionPrompt({
+    required this.quiz,
+    required this.onPlayPronunciation,
+  });
 
   final AdventureLevelQuiz quiz;
+  final VoidCallback onPlayPronunciation;
 
   @override
   Widget build(BuildContext context) {
     if (quiz.usesAudioPrompt) {
-      return const CircleAvatar(
-        radius: 48,
-        backgroundColor: Color(0xFFE5F3EE),
-        child: Icon(
-          Icons.volume_up_rounded,
-          color: Color(0xFF2F856F),
-          size: 54,
+      return GestureDetector(
+        onTap: onPlayPronunciation,
+        child: const CircleAvatar(
+          radius: 48,
+          backgroundColor: Color(0xFFE5F3EE),
+          child: Icon(
+            Icons.volume_up_rounded,
+            color: Color(0xFF2F856F),
+            size: 54,
+          ),
         ),
       );
     }
