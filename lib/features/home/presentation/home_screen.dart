@@ -1,38 +1,67 @@
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
+import '../application/home_dashboard_builder.dart';
+import '../application/home_dashboard_demo.dart';
+import '../domain/home_dashboard_snapshot.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  static const _todayHighlights = [
+    DashboardSectionLine(label: '基础题型', value: '英选中 / 中选英 / 拼写'),
+    DashboardSectionLine(label: '听音训练', value: '听音选词 / 听音拼写'),
+    DashboardSectionLine(label: '复习策略', value: '答错缩短间隔，答对延后复习'),
+  ];
+
+  static const _parentHighlights = [
+    DashboardSectionLine(label: '词表', value: '内置词表 + CSV 导入'),
+    DashboardSectionLine(label: '看板', value: '完成情况 / 正确率 / 高频错词'),
+    DashboardSectionLine(label: '数据', value: '本地保存，支持备份导入导出'),
+  ];
+
+  final HomeDashboardBuilder _builder = const HomeDashboardBuilder();
+  late final List<ChildDashboardSnapshot> _children =
+      HomeDashboardDemo.buildChildSnapshots(builder: _builder);
+
+  int _selectedChildIndex = 0;
+
+  @override
   Widget build(BuildContext context) {
+    final currentChild = _children[_selectedChildIndex];
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
-          children: const [
-            _Header(),
-            SizedBox(height: 20),
-            _ChildProgressCard(
-              name: '哥哥',
-              grade: '初中词表',
-              taskText: '新词 12 个 · 复习 24 个 · 错词 6 个',
-              accuracy: '86%',
-              streak: '连续 5 天',
-              progress: 0.68,
+          children: [
+            const _Header(),
+            const SizedBox(height: 20),
+            _ChildTabs(
+              children: _children,
+              selectedIndex: _selectedChildIndex,
+              onChanged: (index) {
+                setState(() {
+                  _selectedChildIndex = index;
+                });
+              },
             ),
-            SizedBox(height: 12),
-            _ChildProgressCard(
-              name: '妹妹',
-              grade: '小学高年级词表',
-              taskText: '新词 8 个 · 复习 16 个 · 错词 4 个',
-              accuracy: '92%',
-              streak: '连续 3 天',
-              progress: 0.42,
+            const SizedBox(height: 16),
+            _ChildSummaryCard(child: currentChild),
+            const SizedBox(height: 20),
+            const _SectionPanel(
+              title: '今日学习主线',
+              rows: _todayHighlights,
             ),
-            SizedBox(height: 20),
-            _TodayTaskPanel(),
-            SizedBox(height: 20),
-            _ParentPanel(),
+            const SizedBox(height: 20),
+            const _SectionPanel(
+              title: '家长管理',
+              rows: _parentHighlights,
+            ),
           ],
         ),
       ),
@@ -60,33 +89,54 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '每日任务推进闯关进度，两个孩子独立学习，家长轻量掌握状态。',
-          style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF66736D)),
+          style: textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF66736D),
+          ),
         ),
       ],
     );
   }
 }
 
-class _ChildProgressCard extends StatelessWidget {
-  const _ChildProgressCard({
-    required this.name,
-    required this.grade,
-    required this.taskText,
-    required this.accuracy,
-    required this.streak,
-    required this.progress,
+class _ChildTabs extends StatelessWidget {
+  const _ChildTabs({
+    required this.children,
+    required this.selectedIndex,
+    required this.onChanged,
   });
 
-  final String name;
-  final String grade;
-  final String taskText;
-  final String accuracy;
-  final String streak;
-  final double progress;
+  final List<ChildDashboardSnapshot> children;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<int>(
+      segments: [
+        for (var index = 0; index < children.length; index++)
+          ButtonSegment<int>(
+            value: index,
+            label: Text(children[index].name),
+          ),
+      ],
+      selected: {selectedIndex},
+      onSelectionChanged: (selection) => onChanged(selection.first),
+      showSelectedIcon: false,
+    );
+  }
+}
+
+class _ChildSummaryCard extends StatelessWidget {
+  const _ChildSummaryCard({
+    required this.child,
+  });
+
+  final ChildDashboardSnapshot child;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Card(
       elevation: 0,
@@ -100,7 +150,7 @@ class _ChildProgressCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   backgroundColor: colorScheme.primaryContainer,
-                  child: Text(name.characters.first),
+                  child: Text(child.name.characters.first),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -108,17 +158,18 @@ class _ChildProgressCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        child.name,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      Text(grade),
+                      const SizedBox(height: 2),
+                      Text(child.gradeLabel),
                     ],
                   ),
                 ),
                 Text(
-                  accuracy,
+                  child.accuracyLabel,
                   style: TextStyle(
                     color: colorScheme.primary,
                     fontWeight: FontWeight.w800,
@@ -127,46 +178,57 @@ class _ChildProgressCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(taskText),
+            Text(child.taskSummary),
             const SizedBox(height: 12),
-            LinearProgressIndicator(value: progress),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(value: child.progress),
+            ),
             const SizedBox(height: 10),
-            Text(streak),
+            Row(
+              children: [
+                Expanded(child: Text(child.streakLabel)),
+                Text(
+                  '${(child.progress * 100).round()}%',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (child.weaknessHighlights.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                '薄弱点：${child.weaknessHighlights.join(' · ')}',
+                style: textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF66736D),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('开始今日任务'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('查看错词'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TodayTaskPanel extends StatelessWidget {
-  const _TodayTaskPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SectionPanel(
-      title: '今日学习主线',
-      rows: [
-        _InfoRow(label: '基础题型', value: '英选中 / 中选英 / 拼写'),
-        _InfoRow(label: '听音训练', value: '听音选词 / 听音拼写'),
-        _InfoRow(label: '复习策略', value: '答错缩短间隔，答对延后复习'),
-      ],
-    );
-  }
-}
-
-class _ParentPanel extends StatelessWidget {
-  const _ParentPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SectionPanel(
-      title: '家长管理',
-      rows: [
-        _InfoRow(label: '词表', value: '内置词表 + CSV 导入'),
-        _InfoRow(label: '看板', value: '完成情况 / 正确率 / 高频错词'),
-        _InfoRow(label: '数据', value: '本地保存，支持备份导入导出'),
-      ],
     );
   }
 }
@@ -178,7 +240,7 @@ class _SectionPanel extends StatelessWidget {
   });
 
   final String title;
-  final List<Widget> rows;
+  final List<DashboardSectionLine> rows;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +259,10 @@ class _SectionPanel extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 12),
-            ...rows,
+            for (final row in rows) ...[
+              _InfoRow(label: row.label, value: row.value),
+              const SizedBox(height: 12),
+            ],
           ],
         ),
       ),
@@ -216,24 +281,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 82,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF66736D),
-                fontWeight: FontWeight.w600,
-              ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 82,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF66736D),
+              fontWeight: FontWeight.w600,
             ),
           ),
-          Expanded(child: Text(value)),
-        ],
-      ),
+        ),
+        Expanded(child: Text(value)),
+      ],
     );
   }
 }
