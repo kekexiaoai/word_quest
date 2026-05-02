@@ -28,6 +28,12 @@ flutter test
 flutter run -d chrome
 ```
 
+## 当前验证记录
+
+- `flutter --version`：未通过，当前环境提示 `command not found: flutter`。
+- `flutter test`：未通过，当前环境提示 `command not found: flutter`。
+- 安装 Flutter SDK 后，优先运行 `flutter pub get` 和 `flutter test`。
+
 ## 文档
 
 - 产品设计：`docs/superpowers/specs/2026-05-02-word-quest-design.md`
