@@ -26,10 +26,20 @@ class AdventureLevelQuizBuilder {
           selectedWordBookId,
           learningProgresses,
         ),
-      AdventureLevelType.reviewExplore =>
-        _reviewExplore(level, questionIndex, answerRecords, wordCatalog),
-      AdventureLevelType.mistakeBoss =>
-        _mistakeBoss(level, questionIndex, answerRecords, wordCatalog),
+      AdventureLevelType.reviewExplore => _reviewExplore(
+          level,
+          questionIndex,
+          answerRecords,
+          wordCatalog,
+          learningProgresses,
+        ),
+      AdventureLevelType.mistakeBoss => _mistakeBoss(
+          level,
+          questionIndex,
+          answerRecords,
+          wordCatalog,
+          learningProgresses,
+        ),
       AdventureLevelType.chestSettlement =>
         _chestSettlement(level, questionIndex),
     };
@@ -42,7 +52,7 @@ class AdventureLevelQuizBuilder {
     String? selectedWordBookId,
     List<WordLearningProgress> learningProgresses,
   ) {
-    final selectedWords = _unmasteredWords(
+    final selectedWords = _prioritizedNewWords(
       level,
       _wordsInBook(wordCatalog, selectedWordBookId),
       learningProgresses,
@@ -54,7 +64,7 @@ class AdventureLevelQuizBuilder {
     ];
     final newWords = selectedWords.isNotEmpty
         ? selectedWords
-        : _unmasteredWords(level, fallbackWords, learningProgresses);
+        : _prioritizedNewWords(level, fallbackWords, learningProgresses);
 
     if (newWords.isNotEmpty) {
       final word = _seedAt(newWords, questionIndex);
@@ -104,11 +114,13 @@ class AdventureLevelQuizBuilder {
     int questionIndex,
     List<AnswerRecord> answerRecords,
     List<_KnownWord> wordCatalog,
+    List<WordLearningProgress> learningProgresses,
   ) {
     final weaknessSeeds = _weaknessReviewSeeds(
       level,
       answerRecords,
       wordCatalog,
+      learningProgresses,
     );
     if (weaknessSeeds.isNotEmpty) {
       final seed = _seedAt(weaknessSeeds, questionIndex);
@@ -157,8 +169,14 @@ class AdventureLevelQuizBuilder {
     int questionIndex,
     List<AnswerRecord> answerRecords,
     List<_KnownWord> wordCatalog,
+    List<WordLearningProgress> learningProgresses,
   ) {
-    final mistakeSeeds = _mistakeSeeds(level, answerRecords, wordCatalog);
+    final mistakeSeeds = _mistakeSeeds(
+      level,
+      answerRecords,
+      wordCatalog,
+      learningProgresses,
+    );
     if (mistakeSeeds.isNotEmpty) {
       final word = _seedAt(mistakeSeeds, questionIndex);
       return AdventureLevelQuiz(
@@ -261,49 +279,274 @@ class AdventureLevelQuizBuilder {
     AdventureLevel level,
     List<AnswerRecord> answerRecords,
     List<_KnownWord> wordCatalog,
+    List<WordLearningProgress> learningProgresses,
   ) {
+    final progressByWordId = _progressByWordId(level, learningProgresses);
     final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
-    final seenWordIds = <String>{};
-    final seeds = <_WeaknessReviewSeed>[];
+    final seedsByWordId = <String, _WeaknessReviewSeed>{};
+
+    for (final progress in progressByWordId.values) {
+      if (!_isDueForReview(level, progress) || progress.isMastered) {
+        continue;
+      }
+      final word = _knownWordById(progress.wordId, wordCatalog);
+      if (word == null) {
+        continue;
+      }
+      final weaknessType =
+          progress.lastWeaknessType ?? AnswerWeaknessType.meaning;
+      seedsByWordId[word.id] = _WeaknessReviewSeed(
+        word: word,
+        weaknessType: weaknessType,
+        practiceMode: _practiceModeFor(weaknessType),
+        wordCatalog: wordCatalog,
+        progress: progress,
+      );
+    }
 
     for (final record in sortedRecords) {
       final weaknessType = record.weaknessType;
       final word = _knownWordById(record.wordId, wordCatalog);
-      if (weaknessType == null || word == null || !seenWordIds.add(word.id)) {
+      if (weaknessType == null || word == null) {
         continue;
       }
 
-      seeds.add(
-        _WeaknessReviewSeed(
+      seedsByWordId.putIfAbsent(
+        word.id,
+        () => _WeaknessReviewSeed(
           word: word,
           weaknessType: weaknessType,
           practiceMode: _practiceModeFor(weaknessType),
           wordCatalog: wordCatalog,
+          progress: progressByWordId[word.id],
+          lastIncorrectAt: record.answeredAt,
         ),
       );
+      final existingSeed = seedsByWordId[word.id];
+      if (existingSeed?.lastIncorrectAt == null &&
+          existingSeed?.progress != null) {
+        seedsByWordId[word.id] = existingSeed!.copyWith(
+          lastIncorrectAt: record.answeredAt,
+        );
+      }
     }
 
-    return seeds;
+    return seedsByWordId.values.toList()
+      ..sort((a, b) => _compareReviewSeeds(level, a, b));
   }
 
   List<_KnownWord> _mistakeSeeds(
     AdventureLevel level,
     List<AnswerRecord> answerRecords,
     List<_KnownWord> wordCatalog,
+    List<WordLearningProgress> learningProgresses,
   ) {
+    final progressByWordId = _progressByWordId(level, learningProgresses);
     final sortedRecords = _sortedIncorrectRecords(level, answerRecords);
-    final seenWordIds = <String>{};
-    final words = <_KnownWord>[];
+    final candidatesByWordId = <String, _MistakeCandidate>{};
+
+    for (final progress in progressByWordId.values) {
+      if (progress.consecutiveMistakes <= 0) {
+        continue;
+      }
+      final word = _knownWordById(progress.wordId, wordCatalog);
+      if (word == null) {
+        continue;
+      }
+      candidatesByWordId[word.id] = _MistakeCandidate(
+        word: word,
+        progress: progress,
+      );
+    }
 
     for (final record in sortedRecords) {
       final word = _knownWordById(record.wordId, wordCatalog);
-      if (word == null || !seenWordIds.add(word.id)) {
+      if (word == null) {
         continue;
       }
-      words.add(word);
+      candidatesByWordId.putIfAbsent(
+        word.id,
+        () => _MistakeCandidate(
+          word: word,
+          progress: progressByWordId[word.id],
+          lastIncorrectAt: record.answeredAt,
+        ),
+      );
+      final existingCandidate = candidatesByWordId[word.id];
+      if (existingCandidate?.lastIncorrectAt == null) {
+        candidatesByWordId[word.id] = existingCandidate!.copyWith(
+          lastIncorrectAt: record.answeredAt,
+        );
+      }
     }
 
-    return words;
+    return [
+      for (final candidate
+          in candidatesByWordId.values.toList()
+            ..sort((a, b) => _compareMistakeCandidates(level, a, b)))
+        candidate.word,
+    ];
+  }
+
+  int _compareReviewSeeds(
+    AdventureLevel level,
+    _WeaknessReviewSeed a,
+    _WeaknessReviewSeed b,
+  ) {
+    final dueCompare = _trueFirstCompare(
+      _isDueForReview(level, a.progress),
+      _isDueForReview(level, b.progress),
+    );
+    if (dueCompare != 0) {
+      return dueCompare;
+    }
+
+    final masteryCompare =
+        _masteryLevelOf(a.progress).compareTo(_masteryLevelOf(b.progress));
+    if (masteryCompare != 0) {
+      return masteryCompare;
+    }
+
+    final nextReviewCompare =
+        _nextReviewAtOf(a.progress).compareTo(_nextReviewAtOf(b.progress));
+    if (nextReviewCompare != 0) {
+      return nextReviewCompare;
+    }
+
+    return _dateDescendingCompare(a.lastIncorrectAt, b.lastIncorrectAt);
+  }
+
+  int _compareMistakeCandidates(
+    AdventureLevel level,
+    _MistakeCandidate a,
+    _MistakeCandidate b,
+  ) {
+    final mistakeCompare = _consecutiveMistakesOf(b.progress)
+        .compareTo(_consecutiveMistakesOf(a.progress));
+    if (mistakeCompare != 0) {
+      return mistakeCompare;
+    }
+
+    final masteryCompare =
+        _masteryLevelOf(a.progress).compareTo(_masteryLevelOf(b.progress));
+    if (masteryCompare != 0) {
+      return masteryCompare;
+    }
+
+    final dueCompare = _trueFirstCompare(
+      _isDueForReview(level, a.progress),
+      _isDueForReview(level, b.progress),
+    );
+    if (dueCompare != 0) {
+      return dueCompare;
+    }
+
+    final nextReviewCompare =
+        _nextReviewAtOf(a.progress).compareTo(_nextReviewAtOf(b.progress));
+    if (nextReviewCompare != 0) {
+      return nextReviewCompare;
+    }
+
+    return _dateDescendingCompare(a.lastIncorrectAt, b.lastIncorrectAt);
+  }
+
+  int _trueFirstCompare(bool a, bool b) {
+    if (a == b) {
+      return 0;
+    }
+    return a ? -1 : 1;
+  }
+
+  int _dateDescendingCompare(DateTime? a, DateTime? b) {
+    if (a == null && b == null) {
+      return 0;
+    }
+    if (a == null) {
+      return 1;
+    }
+    if (b == null) {
+      return -1;
+    }
+    return b.compareTo(a);
+  }
+
+  int _masteryLevelOf(WordLearningProgress? progress) {
+    return progress?.masteryLevel ?? 0;
+  }
+
+  int _consecutiveMistakesOf(WordLearningProgress? progress) {
+    return progress?.consecutiveMistakes ?? 0;
+  }
+
+  DateTime _nextReviewAtOf(WordLearningProgress? progress) {
+    return progress?.nextReviewAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  bool _isDueForReview(
+    AdventureLevel level,
+    WordLearningProgress? progress,
+  ) {
+    if (progress == null) {
+      return false;
+    }
+    return !_dateOnly(progress.nextReviewAt).isAfter(_dateOnly(level.date));
+  }
+
+  DateTime _dateOnly(DateTime dateTime) {
+    return DateTime(dateTime.year, dateTime.month, dateTime.day);
+  }
+
+  Map<String, WordLearningProgress> _progressByWordId(
+    AdventureLevel level,
+    List<WordLearningProgress> learningProgresses,
+  ) {
+    final result = <String, WordLearningProgress>{};
+    for (final progress in learningProgresses) {
+      if (progress.childId != level.childId) {
+        continue;
+      }
+      final existing = result[progress.wordId];
+      if (existing == null || progress.updatedAt.isAfter(existing.updatedAt)) {
+        result[progress.wordId] = progress;
+      }
+    }
+    return result;
+  }
+
+  List<_KnownWord> _prioritizedNewWords(
+    AdventureLevel level,
+    List<_KnownWord> words,
+    List<WordLearningProgress> learningProgresses,
+  ) {
+    final progressByWordId = _progressByWordId(level, learningProgresses);
+    final prioritizedWords = List<_KnownWord>.of(
+      _unmasteredWords(level, words, learningProgresses),
+    );
+    prioritizedWords.sort((a, b) {
+      final progressA = progressByWordId[a.id];
+      final progressB = progressByWordId[b.id];
+      final priorityCompare = _newWordPriority(level, progressA).compareTo(
+        _newWordPriority(level, progressB),
+      );
+      if (priorityCompare != 0) {
+        return priorityCompare;
+      }
+      return _dateDescendingCompare(progressA?.updatedAt, progressB?.updatedAt);
+    });
+    return prioritizedWords;
+  }
+
+  int _newWordPriority(
+    AdventureLevel level,
+    WordLearningProgress? progress,
+  ) {
+    if (progress == null) {
+      return 0;
+    }
+    if (_isDueForReview(level, progress)) {
+      return 1 + progress.masteryLevel;
+    }
+    return 10 + progress.masteryLevel;
   }
 
   List<AnswerRecord> _sortedIncorrectRecords(
@@ -524,10 +767,49 @@ class _WeaknessReviewSeed {
     required this.weaknessType,
     required this.practiceMode,
     required this.wordCatalog,
+    this.progress,
+    this.lastIncorrectAt,
   });
 
   final _KnownWord word;
   final AnswerWeaknessType weaknessType;
   final PracticeMode practiceMode;
   final List<_KnownWord> wordCatalog;
+  final WordLearningProgress? progress;
+  final DateTime? lastIncorrectAt;
+
+  _WeaknessReviewSeed copyWith({
+    DateTime? lastIncorrectAt,
+  }) {
+    return _WeaknessReviewSeed(
+      word: word,
+      weaknessType: weaknessType,
+      practiceMode: practiceMode,
+      wordCatalog: wordCatalog,
+      progress: progress,
+      lastIncorrectAt: lastIncorrectAt ?? this.lastIncorrectAt,
+    );
+  }
+}
+
+class _MistakeCandidate {
+  const _MistakeCandidate({
+    required this.word,
+    this.progress,
+    this.lastIncorrectAt,
+  });
+
+  final _KnownWord word;
+  final WordLearningProgress? progress;
+  final DateTime? lastIncorrectAt;
+
+  _MistakeCandidate copyWith({
+    DateTime? lastIncorrectAt,
+  }) {
+    return _MistakeCandidate(
+      word: word,
+      progress: progress,
+      lastIncorrectAt: lastIncorrectAt ?? this.lastIncorrectAt,
+    );
+  }
 }

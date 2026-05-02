@@ -187,6 +187,45 @@ void main() {
     expect(quiz.correctAnswer, '河流');
   });
 
+  test('新词热身关优先选择当前词表中没有学习进度的新词', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[0],
+      selectedWordBookId: 'middle-core',
+      wordBooks: const [
+        WordBook(
+          id: 'middle-core',
+          name: '初中核心词表',
+          stageLabel: '初中词表',
+          isBuiltIn: true,
+          words: [
+            WordEntry(id: 'energy', spelling: 'energy', meanings: ['能量']),
+            WordEntry(id: 'planet', spelling: 'planet', meanings: ['行星']),
+          ],
+        ),
+      ],
+      learningProgresses: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'energy',
+          masteryLevel: 1,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1),
+        ),
+      ],
+    );
+
+    expect(quiz.wordId, 'planet');
+    expect(quiz.prompt, 'planet');
+  });
+
   test('题组会按题号更新进度和题面', () {
     const repository = InMemoryAdventureRepository();
     const builder = AdventureLevelQuizBuilder();
@@ -259,6 +298,63 @@ void main() {
     expect(quiz.wordId, 'library');
     expect(quiz.practiceMode, PracticeMode.listeningChoice);
     expect(quiz.correctAnswer, 'library');
+  });
+
+  test('复习探索关优先选择到期且掌握等级较低的单词', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[1],
+      wordBooks: _wordBooks,
+      answerRecords: [
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'library',
+          practiceMode: PracticeMode.listeningChoice,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 10),
+          elapsedMilliseconds: 1200,
+          weaknessType: AnswerWeaknessType.listening,
+        ),
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          practiceMode: PracticeMode.listeningChoice,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 1, 10),
+          elapsedMilliseconds: 1200,
+          weaknessType: AnswerWeaknessType.listening,
+        ),
+      ],
+      learningProgresses: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'library',
+          masteryLevel: 4,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 9),
+          updatedAt: DateTime(2026, 5, 2, 10),
+        ),
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          masteryLevel: 1,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 2, 18),
+          updatedAt: DateTime(2026, 5, 1, 10),
+          lastWeaknessType: AnswerWeaknessType.listening,
+        ),
+      ],
+    );
+
+    expect(quiz.activityTitle, '薄弱点复习');
+    expect(quiz.wordId, 'neighbor');
+    expect(quiz.practiceMode, PracticeMode.listeningChoice);
   });
 
   test('错词 Boss 关生成正向挑战题组', () {
@@ -359,6 +455,63 @@ void main() {
     expect(quiz.wordId, 'custom-ocean');
     expect(quiz.correctAnswer, '海洋');
     expect(quiz.choices, contains('河流'));
+  });
+
+  test('错词 Boss 优先选择连续错误仍未修复的单词', () {
+    const repository = InMemoryAdventureRepository();
+    const builder = AdventureLevelQuizBuilder();
+    final adventure = repository.loadAdventure(
+      childId: 'child-brother',
+      referenceDate: DateTime(2026, 5, 2),
+    );
+
+    final quiz = builder.buildForLevel(
+      adventure.levels[2],
+      wordBooks: _wordBooks,
+      answerRecords: [
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'library',
+          practiceMode: PracticeMode.englishToChinese,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 2, 10),
+          elapsedMilliseconds: 900,
+          weaknessType: AnswerWeaknessType.meaning,
+        ),
+        AnswerRecord(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          practiceMode: PracticeMode.englishToChinese,
+          isCorrect: false,
+          answeredAt: DateTime(2026, 5, 1, 9),
+          elapsedMilliseconds: 900,
+          weaknessType: AnswerWeaknessType.meaning,
+        ),
+      ],
+      learningProgresses: [
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'library',
+          masteryLevel: 2,
+          consecutiveMistakes: 0,
+          nextReviewAt: DateTime(2026, 5, 8),
+          updatedAt: DateTime(2026, 5, 2, 10),
+        ),
+        WordLearningProgress(
+          childId: 'child-brother',
+          wordId: 'neighbor',
+          masteryLevel: 0,
+          consecutiveMistakes: 2,
+          nextReviewAt: DateTime(2026, 5, 2),
+          updatedAt: DateTime(2026, 5, 1, 9),
+          lastWeaknessType: AnswerWeaknessType.meaning,
+        ),
+      ],
+    );
+
+    expect(quiz.wordId, 'neighbor');
+    expect(quiz.prompt, 'neighbor');
+    expect(quiz.correctAnswer, '邻居');
   });
 }
 
