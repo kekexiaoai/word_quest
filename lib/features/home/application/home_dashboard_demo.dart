@@ -11,10 +11,11 @@ class HomeDashboardDemo {
 
   static List<ChildDashboardSnapshot> buildChildSnapshots({
     required HomeDashboardBuilder builder,
+    required DateTime referenceDate,
   }) {
     final brotherTask = _buildTask(
       childId: 'child-brother',
-      date: DateTime(2026, 5, 2, 18),
+      date: _sameDayAt(referenceDate, 18),
       newWordLimit: 12,
       reviewLimit: 24,
       mistakeLimit: 6,
@@ -24,7 +25,7 @@ class HomeDashboardDemo {
     );
     final sisterTask = _buildTask(
       childId: 'child-sister',
-      date: DateTime(2026, 5, 2, 18),
+      date: _sameDayAt(referenceDate, 18),
       newWordLimit: 8,
       reviewLimit: 16,
       mistakeLimit: 4,
@@ -40,12 +41,12 @@ class HomeDashboardDemo {
           name: '哥哥',
           gradeLabel: '初中词表',
           avatarSeed: '哥哥',
-          createdAt: DateTime(2026, 5, 1),
+          createdAt: referenceDate.subtract(const Duration(days: 1)),
         ),
         todayTask: brotherTask,
         answerRecords: _brotherRecords(),
         completedItems: 29,
-        referenceDate: DateTime(2026, 5, 2),
+        referenceDate: referenceDate,
       ),
       builder.buildChildSnapshot(
         child: ChildProfile(
@@ -53,12 +54,12 @@ class HomeDashboardDemo {
           name: '妹妹',
           gradeLabel: '小学高年级词表',
           avatarSeed: '妹妹',
-          createdAt: DateTime(2026, 5, 1),
+          createdAt: referenceDate.subtract(const Duration(days: 1)),
         ),
         todayTask: sisterTask,
         answerRecords: _sisterRecords(),
         completedItems: 12,
-        referenceDate: DateTime(2026, 5, 2),
+        referenceDate: referenceDate,
       ),
     ];
   }
@@ -273,6 +274,11 @@ class HomeDashboardDemo {
         meanings: ['释义 $index'],
       ),
     );
+  }
+
+  static DateTime _sameDayAt(DateTime referenceDate, int hour) {
+    return DateTime(
+        referenceDate.year, referenceDate.month, referenceDate.day, hour);
   }
 }
 

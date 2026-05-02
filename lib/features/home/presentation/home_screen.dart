@@ -1,38 +1,36 @@
 import 'package:flutter/material.dart';
 
-import '../application/home_dashboard_builder.dart';
-import '../application/home_dashboard_demo.dart';
+import '../application/in_memory_home_dashboard_repository.dart';
+import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.dashboardRepository = const InMemoryHomeDashboardRepository(),
+  });
+
+  final HomeDashboardRepository dashboardRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _todayHighlights = [
-    DashboardSectionLine(label: '基础题型', value: '英选中 / 中选英 / 拼写'),
-    DashboardSectionLine(label: '听音训练', value: '听音选词 / 听音拼写'),
-    DashboardSectionLine(label: '复习策略', value: '答错缩短间隔，答对延后复习'),
-  ];
-
-  static const _parentHighlights = [
-    DashboardSectionLine(label: '词表', value: '内置词表 + CSV 导入'),
-    DashboardSectionLine(label: '看板', value: '完成情况 / 正确率 / 高频错词'),
-    DashboardSectionLine(label: '数据', value: '本地保存，支持备份导入导出'),
-  ];
-
-  final HomeDashboardBuilder _builder = const HomeDashboardBuilder();
-  late final List<ChildDashboardSnapshot> _children =
-      HomeDashboardDemo.buildChildSnapshots(builder: _builder);
-
+  late final HomeDashboardSnapshot _dashboard;
   int _selectedChildIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _dashboard = widget.dashboardRepository.loadDashboard(
+      referenceDate: DateTime.now(),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentChild = _children[_selectedChildIndex];
+    final currentChild = _dashboard.children[_selectedChildIndex];
 
     return Scaffold(
       body: SafeArea(
@@ -42,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const _Header(),
             const SizedBox(height: 20),
             _ChildTabs(
-              children: _children,
+              children: _dashboard.children,
               selectedIndex: _selectedChildIndex,
               onChanged: (index) {
                 setState(() {
@@ -55,12 +53,29 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
             const _SectionPanel(
               title: '今日学习主线',
-              rows: _todayHighlights,
+              rows: [
+                DashboardSectionLine(
+                  label: '基础题型',
+                  value: '英选中 / 中选英 / 拼写',
+                ),
+                DashboardSectionLine(
+                  label: '听音训练',
+                  value: '听音选词 / 听音拼写',
+                ),
+                DashboardSectionLine(
+                  label: '复习策略',
+                  value: '答错缩短间隔，答对延后复习',
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const _SectionPanel(
               title: '家长管理',
-              rows: _parentHighlights,
+              rows: [
+                DashboardSectionLine(label: '词表', value: '内置词表 + CSV 导入'),
+                DashboardSectionLine(label: '看板', value: '完成情况 / 正确率 / 高频错词'),
+                DashboardSectionLine(label: '数据', value: '本地保存，支持备份导入导出'),
+              ],
             ),
           ],
         ),
