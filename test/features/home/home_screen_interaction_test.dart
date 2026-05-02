@@ -28,6 +28,9 @@ void main() {
 
     expect(find.text('今天完成了'), findsOneWidget);
     expect(find.text('安安获得 3 颗星，森林书屋第 4 站已点亮。'), findsOneWidget);
+    expect(find.text('普通食物 +1'), findsOneWidget);
+    expect(find.text('宠物成长 +24'), findsOneWidget);
+    expect(find.text('喂食豆豆'), findsOneWidget);
   });
 
   testWidgets('首页采用新版词途今日学习结构', (tester) async {
@@ -39,10 +42,12 @@ void main() {
     expect(find.text('今日任务'), findsOneWidget);
     expect(find.text('12 分钟完成剩余练习'), findsOneWidget);
     expect(find.text('继续学习'), findsOneWidget);
-    expect(find.text('接下来'), findsOneWidget);
-    expect(find.text('听音训练'), findsOneWidget);
-    expect(find.text('需要留意'), findsOneWidget);
-    expect(find.text('through 拼写仍不稳'), findsOneWidget);
+    expect(find.text('今日冒险'), findsOneWidget);
+    expect(find.text('森林冒险'), findsOneWidget);
+    expect(find.text('复习探索关'), findsOneWidget);
+    expect(find.text('豆豆 Lv.2'), findsOneWidget);
+    expect(find.text('饱腹 68%'), findsOneWidget);
+    expect(find.text('喂食'), findsOneWidget);
 
     expect(find.text('宁宁'), findsNothing);
     expect(find.text('内置词表'), findsNothing);
@@ -51,6 +56,17 @@ void main() {
 
   testWidgets('底部导航可以切换到新版词表和设置页', (tester) async {
     await _pumpHome(tester);
+
+    await tester.tap(find.byKey(const ValueKey('home_tab_quest')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('森林冒险'), findsWidgets);
+    expect(find.text('今日路线'), findsOneWidget);
+    expect(find.text('新词热身关'), findsOneWidget);
+    expect(find.text('复习探索关'), findsOneWidget);
+    expect(find.text('错词 Boss 关'), findsOneWidget);
+    expect(find.text('宝箱结算关'), findsOneWidget);
+    expect(find.text('豆豆 Lv.2'), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('home_tab_word_book')));
     await tester.pumpAndSettle();

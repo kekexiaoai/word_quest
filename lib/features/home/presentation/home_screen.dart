@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../adventure/application/in_memory_adventure_repository.dart';
+import '../../adventure/domain/adventure_dashboard_snapshot.dart';
+import '../../adventure/domain/adventure_level.dart';
+import '../../adventure/domain/adventure_repository.dart';
+import '../../adventure/domain/pet_profile.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
@@ -13,13 +18,42 @@ enum _HomeTab {
 
 const _tabContentPadding = EdgeInsets.fromLTRB(18, 18, 18, 128);
 
+Color _levelColor(AdventureLevelStatus status) {
+  return switch (status) {
+    AdventureLevelStatus.completed => const Color(0xFF2F856F),
+    AdventureLevelStatus.current => const Color(0xFFFF9500),
+    AdventureLevelStatus.reviewable => const Color(0xFF5856D6),
+    AdventureLevelStatus.locked => const Color(0xFF9B9BA3),
+  };
+}
+
+String _levelStatusLabel(AdventureLevelStatus status) {
+  return switch (status) {
+    AdventureLevelStatus.completed => '已点亮',
+    AdventureLevelStatus.current => '进行中',
+    AdventureLevelStatus.reviewable => '可复习',
+    AdventureLevelStatus.locked => '未解锁',
+  };
+}
+
+String _shortLevelTitle(AdventureLevelType type) {
+  return switch (type) {
+    AdventureLevelType.newWordWarmup => '新词',
+    AdventureLevelType.reviewExplore => '复习',
+    AdventureLevelType.mistakeBoss => 'Boss',
+    AdventureLevelType.chestSettlement => '宝箱',
+  };
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.dashboardRepository = const InMemoryHomeDashboardRepository(),
+    this.adventureRepository = const InMemoryAdventureRepository(),
   });
 
   final HomeDashboardRepository dashboardRepository;
+  final AdventureRepository adventureRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -27,6 +61,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeDashboardSnapshot _dashboard;
+  late final AdventureDashboardSnapshot _adventure;
   _HomeTab _selectedTab = _HomeTab.today;
   bool _isStudying = false;
   bool _isComplete = false;
@@ -34,8 +69,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final referenceDate = DateTime.now();
     _dashboard = widget.dashboardRepository.loadDashboard(
-      referenceDate: DateTime.now(),
+      referenceDate: referenceDate,
+    );
+    _adventure = widget.adventureRepository.loadAdventure(
+      childId: _dashboard.children.first.id,
+      referenceDate: referenceDate,
     );
   }
 
@@ -51,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyCompleteScreen(
+                adventure: _adventure,
                 onBackToday: () {
                   setState(() {
                     _isStudying = false;
@@ -134,13 +175,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return switch (_selectedTab) {
       _HomeTab.today => _TodayTabView(
           currentChild: currentChild,
+          adventure: _adventure,
           onContinue: () {
             setState(() {
               _isStudying = true;
             });
           },
         ),
-      _HomeTab.quest => const _QuestTabView(),
+      _HomeTab.quest => _QuestTabView(adventure: _adventure),
       _HomeTab.wordBook => const _WordBookTabView(),
       _HomeTab.settings => _SettingsTabView(currentChild: currentChild),
     };
@@ -150,10 +192,12 @@ class _HomeScreenState extends State<HomeScreen> {
 class _TodayTabView extends StatelessWidget {
   const _TodayTabView({
     required this.currentChild,
+    required this.adventure,
     required this.onContinue,
   });
 
   final ChildDashboardSnapshot currentChild;
+  final AdventureDashboardSnapshot adventure;
   final VoidCallback onContinue;
 
   @override
@@ -171,7 +215,9 @@ class _TodayTabView extends StatelessWidget {
           child: currentChild,
           onContinue: onContinue,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
+        _AdventureOverviewCard(adventure: adventure),
+        const SizedBox(height: 24),
         Row(
           children: [
             Expanded(
@@ -189,27 +235,223 @@ class _TodayTabView extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 28),
-        const _SectionTitle('接下来'),
-        const SizedBox(height: 14),
-        const _SingleActionCard(
-          icon: Icons.volume_up_rounded,
-          iconColor: Color(0xFF5856D6),
-          iconBackground: Color(0xFFECEBFF),
-          title: '听音训练',
-          subtitle: '4 题 · 约 3 分钟',
+      ],
+    );
+  }
+}
+
+class _AdventureOverviewCard extends StatelessWidget {
+  const _AdventureOverviewCard({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentLevel = adventure.currentLevel;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Text(
+                      '今日冒险',
+                      style: TextStyle(
+                        color: Color(0xFF111114),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        adventure.themeTitle,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF2F856F),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _CompactBadge(
+                label: '${adventure.starsEarned}/${adventure.starsTarget} 星',
+                icon: Icons.star_rounded,
+                color: const Color(0xFFFF9500),
+                backgroundColor: const Color(0xFFFFF2D9),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _PetInlinePanel(pet: adventure.pet),
+          const SizedBox(height: 12),
+          _CompactBadge(
+            label: currentLevel.title,
+            icon: Icons.explore_rounded,
+            color: const Color(0xFFFF9500),
+            backgroundColor: const Color(0xFFFFF2D9),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            adventure.currentNodeTitle,
+            style: const TextStyle(
+              color: Color(0xFF70727A),
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _MiniLevelRoute(levels: adventure.levels),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniLevelRoute extends StatelessWidget {
+  const _MiniLevelRoute({required this.levels});
+
+  final List<AdventureLevel> levels;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var index = 0; index < levels.length; index++) ...[
+          Expanded(child: _MiniLevelNode(level: levels[index])),
+          if (index < levels.length - 1)
+            Container(
+              width: 14,
+              height: 3,
+              color: const Color(0xFFD7DED9),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MiniLevelNode extends StatelessWidget {
+  const _MiniLevelNode({required this.level});
+
+  final AdventureLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _levelColor(level.status);
+    final icon = switch (level.status) {
+      AdventureLevelStatus.completed => Icons.check_rounded,
+      AdventureLevelStatus.current => Icons.play_arrow_rounded,
+      AdventureLevelStatus.reviewable => Icons.replay_rounded,
+      AdventureLevelStatus.locked => Icons.lock_rounded,
+    };
+
+    return Column(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 22),
         ),
-        const SizedBox(height: 28),
-        const _SectionTitle('需要留意'),
-        const SizedBox(height: 14),
-        const _SingleActionCard(
-          icon: Icons.edit_outlined,
-          iconColor: Color(0xFFFF9500),
-          iconBackground: Color(0xFFFFF2D9),
-          title: 'through 拼写仍不稳',
-          subtitle: '已放入今天的错词复习',
+        const SizedBox(height: 6),
+        Text(
+          _shortLevelTitle(level.type),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _PetInlinePanel extends StatelessWidget {
+  const _PetInlinePanel({required this.pet});
+
+  final PetProfile pet;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF6F1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2F856F),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.pets_rounded,
+              color: Colors.white,
+              size: 27,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${pet.name} Lv.${pet.level}',
+                  style: const TextStyle(
+                    color: Color(0xFF111114),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '饱腹 ${pet.satiety}%',
+                  style: const TextStyle(
+                    color: Color(0xFF70727A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {},
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF2F856F),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: const Text('喂食'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -441,6 +683,46 @@ class _ProgressBubble extends StatelessWidget {
   }
 }
 
+class _CompactBadge extends StatelessWidget {
+  const _CompactBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
     required this.value,
@@ -484,67 +766,6 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _SingleActionCard extends StatelessWidget {
-  const _SingleActionCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBackground,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBackground;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          _IconBadge(
-            icon: icon,
-            iconColor: iconColor,
-            backgroundColor: iconBackground,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF111114),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF70727A),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
 
@@ -564,37 +785,35 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _LearningRouteList extends StatelessWidget {
-  const _LearningRouteList();
+  const _LearningRouteList({required this.levels});
+
+  final List<AdventureLevel> levels;
 
   @override
   Widget build(BuildContext context) {
-    return const _GroupedList(
+    return _GroupedList(
       children: [
-        _RouteRow(
-          icon: Icons.ads_click_rounded,
-          iconColor: Color(0xFF34C759),
-          iconBackground: Color(0xFFE5F8EC),
-          title: '基础选择题',
-          subtitle: '英选中 / 中选英 · 8 题',
-          status: '进行中',
-          statusColor: Color(0xFF34C759),
-        ),
-        _RouteRow(
-          icon: Icons.keyboard_rounded,
-          iconColor: Color(0xFFFF9500),
-          iconBackground: Color(0xFFFFF2D9),
-          title: '拼写强化',
-          subtitle: '输出薄弱词 · 6 题',
-        ),
-        _RouteRow(
-          icon: Icons.volume_up_rounded,
-          iconColor: Color(0xFFFF3B30),
-          iconBackground: Color(0xFFFFE5E5),
-          title: '听音训练',
-          subtitle: '听音选词 / 听写 · 4 题',
-        ),
+        for (final level in levels)
+          _RouteRow(
+            icon: _levelIcon(level.type),
+            iconColor: _levelColor(level.status),
+            iconBackground: _levelColor(level.status).withValues(alpha: 0.14),
+            title: level.title,
+            subtitle: level.subtitle,
+            status: _levelStatusLabel(level.status),
+            statusColor: _levelColor(level.status),
+          ),
       ],
     );
+  }
+
+  IconData _levelIcon(AdventureLevelType type) {
+    return switch (type) {
+      AdventureLevelType.newWordWarmup => Icons.auto_awesome_rounded,
+      AdventureLevelType.reviewExplore => Icons.explore_rounded,
+      AdventureLevelType.mistakeBoss => Icons.shield_rounded,
+      AdventureLevelType.chestSettlement => Icons.inventory_2_rounded,
+    };
   }
 }
 
@@ -708,33 +927,44 @@ class _RouteRow extends StatelessWidget {
 }
 
 class _QuestTabView extends StatelessWidget {
-  const _QuestTabView();
+  const _QuestTabView({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: _tabContentPadding,
-      children: const [
+      children: [
         _Header(
-          title: '闯关',
+          title: adventure.themeTitle,
           eyebrow: '学习路线',
-          trailingIcon: Icons.map_outlined,
+          trailing: _CompactBadge(
+            label: '${adventure.starsEarned}/${adventure.starsTarget} 星',
+            icon: Icons.star_rounded,
+            color: const Color(0xFFFF9500),
+            backgroundColor: const Color(0xFFFFF2D9),
+          ),
         ),
-        SizedBox(height: 28),
-        _SectionTitle('今日路线'),
-        SizedBox(height: 14),
-        _LearningRouteList(),
-        SizedBox(height: 28),
-        _SectionTitle('奖励反馈'),
-        SizedBox(height: 14),
-        _RewardPanel(),
+        const SizedBox(height: 18),
+        _MapProgressCard(adventure: adventure),
+        const SizedBox(height: 28),
+        const _SectionTitle('今日路线'),
+        const SizedBox(height: 14),
+        _LearningRouteList(levels: adventure.levels),
+        const SizedBox(height: 28),
+        const _SectionTitle('奖励反馈'),
+        const SizedBox(height: 14),
+        _RewardPanel(adventure: adventure),
       ],
     );
   }
 }
 
 class _RewardPanel extends StatelessWidget {
-  const _RewardPanel();
+  const _RewardPanel({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
 
   @override
   Widget build(BuildContext context) {
@@ -744,19 +974,19 @@ class _RewardPanel extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          _IconBadge(
+          const _IconBadge(
             icon: Icons.star_rounded,
             iconColor: Color(0xFFFF9500),
             backgroundColor: Color(0xFFFFF2D9),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   '完成今日任务可获得 3 颗星',
                   style: TextStyle(
                     color: Color(0xFF111114),
@@ -764,16 +994,73 @@ class _RewardPanel extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  '星星会推进地图节点，连续学习会额外加成。',
-                  style: TextStyle(
+                  '宝箱进度 ${(adventure.chestProgress * 100).round()}%，${adventure.pet.name} 会获得成长值。',
+                  style: const TextStyle(
                     color: Color(0xFF70727A),
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapProgressCard extends StatelessWidget {
+  const _MapProgressCard({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            adventure.currentNodeTitle,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${adventure.pet.name} Lv.${adventure.pet.level} 正在陪你闯关 · 饱腹 ${adventure.pet.satiety}%',
+            style: const TextStyle(
+              color: Color(0xFF70727A),
+              fontSize: 15,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _CompactBadge(
+            label: '${adventure.pet.name} Lv.${adventure.pet.level}',
+            icon: Icons.pets_rounded,
+            color: const Color(0xFF2F856F),
+            backgroundColor: const Color(0xFFE5F8EC),
+          ),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: adventure.chestProgress,
+              minHeight: 9,
+              backgroundColor: const Color(0xFFE2E2E8),
+              color: const Color(0xFF2F856F),
             ),
           ),
         ],
@@ -1325,12 +1612,154 @@ class _AnswerFeedbackPanel extends StatelessWidget {
   }
 }
 
+class _PetRewardStrip extends StatelessWidget {
+  const _PetRewardStrip({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
+
+  @override
+  Widget build(BuildContext context) {
+    final growthReward = _totalGrowthReward(adventure.levels);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF6F1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.pets_rounded,
+            color: Color(0xFF2F856F),
+            size: 26,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${adventure.pet.name} 获得成长 +$growthReward，离下一级更近了。',
+              style: const TextStyle(
+                color: Color(0xFF2F856F),
+                fontSize: 15,
+                height: 1.3,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {},
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF2F856F),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: Text('喂食${adventure.pet.name}'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RewardSummaryGrid extends StatelessWidget {
+  const _RewardSummaryGrid({required this.adventure});
+
+  final AdventureDashboardSnapshot adventure;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstFood = adventure.levels
+        .map((level) => level.reward)
+        .firstWhere((reward) => reward.foodName != null);
+    final growthReward = _totalGrowthReward(adventure.levels);
+
+    return Row(
+      children: [
+        Expanded(
+          child: _RewardChip(
+            icon: Icons.star_rounded,
+            label: '获得 ${adventure.starsTarget} 颗星',
+            color: const Color(0xFFFF9500),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _RewardChip(
+            icon: Icons.restaurant_rounded,
+            label: '${firstFood.foodName} +${firstFood.foodCount}',
+            color: const Color(0xFF2F856F),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _RewardChip(
+            icon: Icons.pets_rounded,
+            label: '宠物成长 +$growthReward',
+            color: const Color(0xFF5856D6),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RewardChip extends StatelessWidget {
+  const _RewardChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 86),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 26),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF111114),
+              fontSize: 14,
+              height: 1.2,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+int _totalGrowthReward(List<AdventureLevel> levels) {
+  return levels.fold(
+    0,
+    (total, level) => total + level.reward.growthPoints,
+  );
+}
+
 class _StudyCompleteScreen extends StatelessWidget {
   const _StudyCompleteScreen({
+    required this.adventure,
     required this.onBackToday,
     required this.onReview,
   });
 
+  final AdventureDashboardSnapshot adventure;
   final VoidCallback onBackToday;
   final VoidCallback onReview;
 
@@ -1346,9 +1775,9 @@ class _StudyCompleteScreen extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
           ),
-          child: const Column(
+          child: Column(
             children: [
-              CircleAvatar(
+              const CircleAvatar(
                 radius: 48,
                 backgroundColor: Color(0xFFFFF2D9),
                 child: Icon(
@@ -1357,8 +1786,8 @@ class _StudyCompleteScreen extends StatelessWidget {
                   size: 52,
                 ),
               ),
-              SizedBox(height: 32),
-              Text(
+              const SizedBox(height: 32),
+              const Text(
                 '今天完成了',
                 style: TextStyle(
                   color: Color(0xFF111114),
@@ -1366,8 +1795,8 @@ class _StudyCompleteScreen extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              SizedBox(height: 22),
-              Text(
+              const SizedBox(height: 22),
+              const Text(
                 '安安获得 3 颗星，森林书屋第 4 站已点亮。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -1377,6 +1806,8 @@ class _StudyCompleteScreen extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              const SizedBox(height: 18),
+              _PetRewardStrip(adventure: adventure),
             ],
           ),
         ),
@@ -1405,6 +1836,10 @@ class _StudyCompleteScreen extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 28),
+        const _SectionTitle('今日奖励'),
+        const SizedBox(height: 14),
+        _RewardSummaryGrid(adventure: adventure),
         const SizedBox(height: 28),
         const _SectionTitle('明天优先复习'),
         const SizedBox(height: 14),
@@ -1442,7 +1877,7 @@ class _StudyCompleteScreen extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            child: const Text('回到今天'),
+            child: Text('喂食${adventure.pet.name}'),
           ),
         ),
         const SizedBox(height: 14),

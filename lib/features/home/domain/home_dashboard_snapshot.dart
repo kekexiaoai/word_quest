@@ -10,6 +10,7 @@ class DashboardSectionLine {
 
 class ChildDashboardSnapshot {
   const ChildDashboardSnapshot({
+    required this.id,
     required this.name,
     required this.gradeLabel,
     required this.taskSummary,
@@ -19,6 +20,7 @@ class ChildDashboardSnapshot {
     required this.weaknessHighlights,
   });
 
+  final String id;
   final String name;
   final String gradeLabel;
   final String taskSummary;

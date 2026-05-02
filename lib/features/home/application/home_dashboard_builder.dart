@@ -17,6 +17,7 @@ class HomeDashboardBuilder {
     final safeCompletedItems = completedItems.clamp(0, totalItems).toInt();
 
     return ChildDashboardSnapshot(
+      id: child.id,
       name: child.name,
       gradeLabel: child.gradeLabel,
       taskSummary: _taskSummary(todayTask),
