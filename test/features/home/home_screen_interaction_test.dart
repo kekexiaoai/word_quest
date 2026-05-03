@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:word_quest/features/adventure/application/in_memory_adventure_repository.dart';
 import 'package:word_quest/features/adventure/domain/adventure_dashboard_snapshot.dart';
+import 'package:word_quest/features/child_profile/application/in_memory_child_profile_repository.dart';
+import 'package:word_quest/features/child_profile/domain/child_profile.dart';
 import 'package:word_quest/features/home/presentation/home_screen.dart';
 import 'package:word_quest/features/study/application/in_memory_answer_record_repository.dart';
 import 'package:word_quest/features/study/application/in_memory_word_learning_progress_repository.dart';
@@ -16,6 +18,57 @@ import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
 void main() {
+  testWidgets('首次启动需要初始化孩子资料和默认学习词表', (tester) async {
+    final childStorage = <ChildProfile>[];
+    final childProfileRepository = InMemoryChildProfileRepository(
+      storage: childStorage,
+    );
+    final selectionRepository = InMemoryLearningWordBookSelectionRepository();
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        childProfileRepository: childProfileRepository,
+        learningWordBookSelectionRepository: selectionRepository,
+        wordBookRepository: const InMemoryWordBookRepository(),
+        adventureRepository: const InMemoryAdventureRepository(storage: {}),
+        answerRecordRepository:
+            const InMemoryAnswerRecordRepository(storage: []),
+        wordLearningProgressRepository:
+            InMemoryWordLearningProgressRepository(storage: []),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('欢迎来到词途'), findsOneWidget);
+    expect(find.text('先设置学习资料'), findsOneWidget);
+    expect(find.text('小学高年级基础词表'), findsOneWidget);
+    expect(find.text('初中核心词表'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('onboarding_child_name_input')),
+      '小明',
+    );
+    await tester
+        .tap(find.byKey(const ValueKey('onboarding_word_book_middle-core')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding_start_button')));
+    await tester.pumpAndSettle();
+
+    expect(childStorage, hasLength(1));
+    expect(childStorage.single.name, '小明');
+    expect(childStorage.single.gradeLabel, '初中词表');
+    expect(
+      selectionRepository.loadSelectedWordBookId(
+          childId: childStorage.single.id),
+      'middle-core',
+    );
+    expect(find.text('欢迎来到词途'), findsNothing);
+    expect(find.text('小明'), findsOneWidget);
+    expect(find.text('继续学习'), findsOneWidget);
+  });
+
   testWidgets('点击继续学习进入做题页', (tester) async {
     await _pumpHome(tester);
 

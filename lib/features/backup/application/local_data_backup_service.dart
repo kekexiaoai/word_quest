@@ -1,5 +1,6 @@
 import '../../adventure/application/local_adventure_repository.dart';
 import '../../child_profile/domain/child_profile.dart';
+import '../../child_profile/domain/child_profile_repository.dart';
 import '../../study/domain/answer_record_repository.dart';
 import '../../study/domain/word_learning_progress_repository.dart';
 import '../../word_book/application/local_learning_word_book_selection_repository.dart';
@@ -14,6 +15,7 @@ class LocalDataBackupService {
     this.wordLearningProgressRepository,
     this.adventureRepository,
     this.learningWordBookSelectionRepository,
+    this.childProfileRepository,
     this.children = const [],
     this.codec = const BackupPackageCodec(),
   });
@@ -24,6 +26,7 @@ class LocalDataBackupService {
   final LocalAdventureRepository? adventureRepository;
   final LocalLearningWordBookSelectionRepository?
       learningWordBookSelectionRepository;
+  final ChildProfileRepository? childProfileRepository;
   final List<ChildProfile> children;
   final BackupPackageCodec codec;
 
@@ -32,7 +35,7 @@ class LocalDataBackupService {
       BackupPackage(
         schemaVersion: BackupPackageCodec.currentSchemaVersion,
         exportedAt: exportedAt ?? DateTime.now(),
-        children: children,
+        children: childProfileRepository?.loadChildren() ?? children,
         wordBooks: wordBookRepository.loadImportedWordBooks(),
         answerRecords: answerRecordRepository.loadAllRecords(),
         wordLearningProgresses:
@@ -63,6 +66,7 @@ class LocalDataBackupService {
     learningWordBookSelectionRepository?.replaceSelections(
       backupPackage.learningWordBookSelections,
     );
+    childProfileRepository?.replaceChildren(backupPackage.children);
   }
 
   void clearLearningRecords() {

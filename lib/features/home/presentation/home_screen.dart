@@ -12,6 +12,9 @@ import '../../adventure/domain/adventure_repository.dart';
 import '../../adventure/domain/pet_profile.dart';
 import '../../backup/application/backup_package_codec.dart';
 import '../../backup/application/local_data_backup_service.dart';
+import '../../child_profile/application/in_memory_child_profile_repository.dart';
+import '../../child_profile/domain/child_profile.dart';
+import '../../child_profile/domain/child_profile_repository.dart';
 import '../application/in_memory_home_dashboard_repository.dart';
 import '../domain/home_dashboard_repository.dart';
 import '../domain/home_dashboard_snapshot.dart';
@@ -78,7 +81,8 @@ String _firstCharacter(String value) {
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
-    this.dashboardRepository = const InMemoryHomeDashboardRepository(),
+    this.dashboardRepository,
+    this.childProfileRepository,
     this.adventureRepository,
     this.answerRecordRepository,
     this.wordLearningProgressRepository,
@@ -87,7 +91,8 @@ class HomeScreen extends StatefulWidget {
     this.pronunciationPlayer,
   });
 
-  final HomeDashboardRepository dashboardRepository;
+  final HomeDashboardRepository? dashboardRepository;
+  final ChildProfileRepository? childProfileRepository;
   final AdventureRepository? adventureRepository;
   final AnswerRecordRepository? answerRecordRepository;
   final WordLearningProgressRepository? wordLearningProgressRepository;
@@ -104,7 +109,9 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _sessionController = AdventureSessionController();
   static const _dailyPlanner = AdventureDailyPlanner();
 
-  late final HomeDashboardSnapshot _dashboard;
+  late HomeDashboardSnapshot _dashboard;
+  late final HomeDashboardRepository _dashboardRepository;
+  late final ChildProfileRepository _childProfileRepository;
   late final AdventureRepository _adventureRepository;
   late final AnswerRecordRepository _answerRecordRepository;
   late final WordLearningProgressRepository _wordLearningProgressRepository;
@@ -133,6 +140,13 @@ class _HomeScreenState extends State<HomeScreen> {
         LocalWordLearningProgressRepository();
     _wordBookRepository =
         widget.wordBookRepository ?? LocalWordBookRepository();
+    _childProfileRepository =
+        widget.childProfileRepository ?? const InMemoryChildProfileRepository();
+    _dashboardRepository = widget.dashboardRepository ??
+        InMemoryHomeDashboardRepository(
+          childProfileRepository: _childProfileRepository,
+          wordBookRepository: _wordBookRepository,
+        );
     _learningWordBookSelectionRepository =
         widget.learningWordBookSelectionRepository ??
             LocalLearningWordBookSelectionRepository();
@@ -141,18 +155,36 @@ class _HomeScreenState extends State<HomeScreen> {
     _pronunciationPlayer =
         widget.pronunciationPlayer ?? createDefaultPronunciationPlayer();
     final referenceDate = DateTime.now();
-    _dashboard = widget.dashboardRepository.loadDashboard(
-      referenceDate: referenceDate,
-    );
-    _selectedChildId = _dashboard.children.first.id;
-    _adventure = _loadPlannedAdventure(
-      childId: _selectedChildId,
-      referenceDate: referenceDate,
-    );
+    _dashboard = _loadDashboard(referenceDate);
+    _selectedChildId =
+        _dashboard.children.isEmpty ? '' : _dashboard.children.first.id;
+    if (_selectedChildId.isNotEmpty) {
+      _adventure = _loadPlannedAdventure(
+        childId: _selectedChildId,
+        referenceDate: referenceDate,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_dashboard.children.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF2F2F7),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: _OnboardingScreen(
+                wordBooks: _wordBookRepository.loadBuiltInWordBooks(),
+                onComplete: _completeOnboarding,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final currentChild = _currentChild;
 
     if (_isComplete) {
@@ -312,6 +344,36 @@ class _HomeScreenState extends State<HomeScreen> {
           onManageData: _openDataManagement,
         ),
     };
+  }
+
+  HomeDashboardSnapshot _loadDashboard(DateTime referenceDate) {
+    return _dashboardRepository.loadDashboard(referenceDate: referenceDate);
+  }
+
+  void _completeOnboarding(_OnboardingProfile profile) {
+    final createdAt = DateTime.now();
+    final child = ChildProfile(
+      id: 'child-${createdAt.microsecondsSinceEpoch}',
+      name: profile.childName,
+      gradeLabel: profile.wordBook.stageLabel,
+      avatarSeed: _firstCharacter(profile.childName),
+      createdAt: createdAt,
+    );
+    _childProfileRepository.replaceChildren([child]);
+    _learningWordBookSelectionRepository.saveSelectedWordBookId(
+      childId: child.id,
+      wordBookId: profile.wordBook.id,
+    );
+
+    setState(() {
+      _dashboard = _loadDashboard(createdAt);
+      _selectedChildId = child.id;
+      _adventure = _loadPlannedAdventure(
+        childId: child.id,
+        referenceDate: createdAt,
+      );
+      _selectedTab = _HomeTab.today;
+    });
   }
 
   Widget _buildParentTodayTab() {
@@ -486,6 +548,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       is LocalLearningWordBookSelectionRepository
                   ? _learningWordBookSelectionRepository
                   : null,
+          childProfileRepository: _childProfileRepository,
+          children: _childProfileRepository.loadChildren(),
         ),
         onDataChanged: () {
           if (mounted) {
@@ -1030,6 +1094,245 @@ class _LearnerPill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OnboardingProfile {
+  const _OnboardingProfile({
+    required this.childName,
+    required this.wordBook,
+  });
+
+  final String childName;
+  final WordBook wordBook;
+}
+
+class _OnboardingScreen extends StatefulWidget {
+  const _OnboardingScreen({
+    required this.wordBooks,
+    required this.onComplete,
+  });
+
+  final List<WordBook> wordBooks;
+  final ValueChanged<_OnboardingProfile> onComplete;
+
+  @override
+  State<_OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<_OnboardingScreen> {
+  late final TextEditingController _nameController;
+  String? _selectedWordBookId;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _selectedWordBookId =
+        widget.wordBooks.isEmpty ? null : widget.wordBooks.first.id;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedWordBook = _selectedWordBook;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 32),
+      children: [
+        const _Header(
+          title: '欢迎来到词途',
+          eyebrow: '先设置学习资料',
+          trailing: SizedBox.shrink(),
+        ),
+        const SizedBox(height: 28),
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '孩子资料',
+                style: TextStyle(
+                  color: Color(0xFF111114),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                key: const ValueKey('onboarding_child_name_input'),
+                controller: _nameController,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: '孩子昵称',
+                  hintText: '例如：小明',
+                  errorText: _errorText,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onChanged: (_) {
+                  if (_errorText != null) {
+                    setState(() {
+                      _errorText = null;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const _SectionTitle('选择学习词表'),
+        const SizedBox(height: 14),
+        for (final wordBook in widget.wordBooks) ...[
+          _OnboardingWordBookCard(
+            wordBook: wordBook,
+            isSelected: wordBook.id == _selectedWordBookId,
+            onTap: () {
+              setState(() {
+                _selectedWordBookId = wordBook.id;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 58,
+          child: FilledButton.icon(
+            key: const ValueKey('onboarding_start_button'),
+            onPressed: selectedWordBook == null ? null : _submit,
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('开始使用'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2F856F),
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  WordBook? get _selectedWordBook {
+    for (final wordBook in widget.wordBooks) {
+      if (wordBook.id == _selectedWordBookId) {
+        return wordBook;
+      }
+    }
+    return null;
+  }
+
+  void _submit() {
+    final childName = _nameController.text.trim();
+    if (childName.isEmpty) {
+      setState(() {
+        _errorText = '请输入孩子昵称';
+      });
+      return;
+    }
+
+    final wordBook = _selectedWordBook;
+    if (wordBook == null) {
+      return;
+    }
+
+    widget.onComplete(
+      _OnboardingProfile(
+        childName: childName,
+        wordBook: wordBook,
+      ),
+    );
+  }
+}
+
+class _OnboardingWordBookCard extends StatelessWidget {
+  const _OnboardingWordBookCard({
+    required this.wordBook,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final WordBook wordBook;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: ValueKey('onboarding_word_book_${wordBook.id}'),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(
+                wordBook.isBuiltIn
+                    ? Icons.school_rounded
+                    : Icons.upload_file_rounded,
+                color: const Color(0xFF2F856F),
+                size: 30,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      wordBook.name,
+                      style: const TextStyle(
+                        color: Color(0xFF111114),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${wordBook.wordCount} 个单词 · ${wordBook.stageLabel}',
+                      style: const TextStyle(
+                        color: Color(0xFF70727A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: isSelected
+                    ? const Color(0xFF2F856F)
+                    : const Color(0xFF9B9BA3),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

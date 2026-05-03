@@ -2,10 +2,19 @@ import '../domain/child_profile.dart';
 import '../domain/child_profile_repository.dart';
 
 class InMemoryChildProfileRepository implements ChildProfileRepository {
-  const InMemoryChildProfileRepository();
+  const InMemoryChildProfileRepository({
+    List<ChildProfile>? storage,
+  }) : _storage = storage;
+
+  final List<ChildProfile>? _storage;
 
   @override
   List<ChildProfile> loadChildren() {
+    final storage = _storage;
+    if (storage != null) {
+      return List<ChildProfile>.of(storage);
+    }
+
     return [
       ChildProfile(
         id: 'child-brother',
@@ -22,5 +31,16 @@ class InMemoryChildProfileRepository implements ChildProfileRepository {
         createdAt: DateTime(2026, 5, 1),
       ),
     ];
+  }
+
+  @override
+  void replaceChildren(List<ChildProfile> children) {
+    final storage = _storage;
+    if (storage == null) {
+      return;
+    }
+    storage
+      ..clear()
+      ..addAll(children);
   }
 }

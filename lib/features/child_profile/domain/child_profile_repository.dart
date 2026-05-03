@@ -4,4 +4,6 @@ abstract class ChildProfileRepository {
   const ChildProfileRepository();
 
   List<ChildProfile> loadChildren();
+
+  void replaceChildren(List<ChildProfile> children);
 }

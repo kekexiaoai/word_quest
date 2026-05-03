@@ -3,6 +3,8 @@ import 'package:word_quest/core/local_storage/local_key_value_store.dart';
 import 'package:word_quest/features/adventure/application/adventure_session_controller.dart';
 import 'package:word_quest/features/adventure/application/local_adventure_repository.dart';
 import 'package:word_quest/features/backup/application/local_data_backup_service.dart';
+import 'package:word_quest/features/child_profile/application/local_child_profile_repository.dart';
+import 'package:word_quest/features/child_profile/domain/child_profile.dart';
 import 'package:word_quest/features/study/application/local_answer_record_repository.dart';
 import 'package:word_quest/features/study/application/local_word_learning_progress_repository.dart';
 import 'package:word_quest/features/study/domain/answer_record.dart';
@@ -23,14 +25,25 @@ void main() {
         LocalLearningWordBookSelectionRepository(store: store);
     final wordLearningProgressRepository =
         LocalWordLearningProgressRepository(store: store);
+    final childProfileRepository = LocalChildProfileRepository(store: store);
     final service = LocalDataBackupService(
       wordBookRepository: wordBookRepository,
       answerRecordRepository: answerRecordRepository,
       adventureRepository: adventureRepository,
       learningWordBookSelectionRepository: selectionRepository,
       wordLearningProgressRepository: wordLearningProgressRepository,
+      childProfileRepository: childProfileRepository,
     );
 
+    childProfileRepository.replaceChildren([
+      ChildProfile(
+        id: 'child-brother',
+        name: '小明',
+        gradeLabel: '初中词表',
+        avatarSeed: '小',
+        createdAt: DateTime(2026, 5, 2),
+      ),
+    ]);
     wordBookRepository.saveImportedWordBook(
       const WordBook(
         id: 'csv-import-1',
@@ -89,12 +102,15 @@ void main() {
         LocalLearningWordBookSelectionRepository(store: targetStore);
     final targetWordLearningProgressRepository =
         LocalWordLearningProgressRepository(store: targetStore);
+    final targetChildProfileRepository =
+        LocalChildProfileRepository(store: targetStore);
     final targetService = LocalDataBackupService(
       wordBookRepository: targetWordBookRepository,
       answerRecordRepository: targetAnswerRecordRepository,
       adventureRepository: targetAdventureRepository,
       learningWordBookSelectionRepository: targetSelectionRepository,
       wordLearningProgressRepository: targetWordLearningProgressRepository,
+      childProfileRepository: targetChildProfileRepository,
     );
 
     targetService.importBackup(backupJson);
@@ -124,6 +140,7 @@ void main() {
           ?.isMastered,
       isTrue,
     );
+    expect(targetChildProfileRepository.loadChildren().single.name, '小明');
   });
 
   test('本地数据备份服务可以清空学习记录但保留词表', () {

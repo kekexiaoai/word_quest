@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/child_profile/application/local_child_profile_repository.dart';
 import '../features/home/presentation/home_screen.dart';
 
 class WordQuestApp extends StatelessWidget {
@@ -18,7 +19,9 @@ class WordQuestApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF7F4EC),
       ),
-      home: const HomeScreen(),
+      home: HomeScreen(
+        childProfileRepository: LocalChildProfileRepository(),
+      ),
     );
   }
 }
