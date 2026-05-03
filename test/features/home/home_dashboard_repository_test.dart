@@ -16,7 +16,7 @@ void main() {
     expect(dashboard.children.first.streakLabel, '连续 6 天');
     expect(dashboard.children.last.name, '宁宁');
     expect(dashboard.children.last.accuracyLabel, '92%');
-    expect(dashboard.bookHighlights, hasLength(3));
+    expect(dashboard.bookHighlights, hasLength(4));
     expect(dashboard.bookHighlights.first.label, '小学高年级基础词表');
     expect(dashboard.todayHighlights, hasLength(3));
     expect(dashboard.parentHighlights, hasLength(3));

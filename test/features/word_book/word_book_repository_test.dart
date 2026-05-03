@@ -6,15 +6,39 @@ import 'package:word_quest/features/word_book/domain/word_book.dart';
 import 'package:word_quest/features/word_book/domain/word_entry.dart';
 
 void main() {
-  test('内存词表仓库返回三个内置词表', () {
+  test('内存词表仓库返回内置词表', () {
     const repository = InMemoryWordBookRepository();
 
     final wordBooks = repository.loadBuiltInWordBooks();
 
-    expect(wordBooks, hasLength(3));
+    expect(wordBooks, hasLength(4));
     expect(wordBooks.first.name, '小学高年级基础词表');
     expect(wordBooks.first.wordCount, 6);
     expect(wordBooks.last.stageLabel, '高中核心词表');
+  });
+
+  test('内存词表仓库包含北京版英语三年级词库', () {
+    const repository = InMemoryWordBookRepository();
+
+    final wordBook = repository
+        .loadBuiltInWordBooks()
+        .singleWhere((wordBook) => wordBook.id == 'beijing-primary-grade-3');
+
+    expect(wordBook.name, '北京版英语三年级词表');
+    expect(wordBook.stageLabel, '小学三年级词表');
+    expect(wordBook.wordCount, 261);
+    expect(wordBook.words.first.spelling, 'hello');
+    expect(wordBook.words.first.meanings, ['你好（问候语）']);
+    expect(wordBook.words.first.tags, ['北京版', '三年级', '三上']);
+    expect(wordBook.words.first.source, '北京出版社北京版（新）三年级英语 Word List');
+    expect(
+      wordBook.words.map((word) => word.spelling),
+      containsAll(['hello', 'sheep', 'weather', 'Beijing opera', 'party']),
+    );
+    expect(
+      wordBook.words.singleWhere((word) => word.spelling == 'weather').tags,
+      ['北京版', '三年级', '三下'],
+    );
   });
 
   test('内存词表仓库可以合并导入词表', () {

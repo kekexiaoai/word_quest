@@ -658,7 +658,10 @@ mountain,高山
     expect(find.text('初中核心词表'), findsWidgets);
     expect(find.text('词表'), findsWidgets);
     expect(find.text('搜索单词、释义或标签'), findsOneWidget);
-    expect(find.text('18'), findsOneWidget);
+    final totalBuiltInWords = const InMemoryWordBookRepository()
+        .loadWordBooks()
+        .fold<int>(0, (total, wordBook) => total + wordBook.wordCount);
+    expect(find.text('$totalBuiltInWords'), findsOneWidget);
     expect(find.text('导入词表'), findsOneWidget);
     expect(
         find.byKey(const ValueKey('word_book_import_button')), findsOneWidget);
