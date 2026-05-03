@@ -939,6 +939,13 @@ mountain,高山
     await tester.tap(find.text('喂食豆豆'));
     await tester.pumpAndSettle();
 
+    expect(find.text('豆豆吃饱啦'), findsOneWidget);
+    expect(find.text('成长值 +24'), findsOneWidget);
+    expect(find.text('饱腹 88%'), findsOneWidget);
+
+    await tester.tap(find.text('回到首页'));
+    await tester.pumpAndSettle();
+
     expect(find.text('豆豆 Lv.3'), findsOneWidget);
     expect(find.text('饱腹 88%'), findsOneWidget);
     expect(find.text('错词 Boss 关'), findsOneWidget);
@@ -958,6 +965,8 @@ mountain,高山
       'library',
     ]);
     await tester.tap(find.text('喂食豆豆'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('回到首页'));
     await tester.pumpAndSettle();
 
     final restoredAnswerStorage = <AnswerRecord>[];

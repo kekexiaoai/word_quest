@@ -126,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isStudying = false;
   bool _isComplete = false;
   bool _isParentMode = false;
+  bool _isPetFedInCompletion = false;
   String? _selectedParentDetailChildId;
   String? _activeStudyChildId;
   String? _activeStudySelectedWordBookId;
@@ -196,6 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyCompleteScreen(
                 adventure: _adventure,
+                isPetFed: _isPetFedInCompletion,
                 onFeedPet: () {
                   setState(() {
                     _adventure = _sessionController.feedPetWithTodayRewards(
@@ -203,14 +205,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       fedAt: DateTime.now(),
                     );
                     _adventureRepository.saveAdventure(_adventure);
+                    _isPetFedInCompletion = true;
+                  });
+                },
+                onReturnHome: () {
+                  setState(() {
                     _isStudying = false;
                     _isComplete = false;
+                    _isPetFedInCompletion = false;
                     _selectedTab = _HomeTab.today;
                   });
                 },
                 onReview: () {
                   setState(() {
                     _isComplete = false;
+                    _isPetFedInCompletion = false;
                     _selectedTab = _HomeTab.wordBook;
                   });
                 },
@@ -253,6 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                     _isStudying = false;
                     _isComplete = _activeStudyCompletesAdventure;
+                    _isPetFedInCompletion = false;
                     _clearActiveStudyOverride();
                   });
                 },
@@ -313,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _activeStudyChildId = null;
                   _activeStudySelectedWordBookId = null;
                   _activeStudyCompletesAdventure = true;
+                  _isPetFedInCompletion = false;
                 });
               },
             ),
@@ -326,6 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _activeStudyChildId = null;
               _activeStudySelectedWordBookId = null;
               _activeStudyCompletesAdventure = true;
+              _isPetFedInCompletion = false;
             });
           },
         ),
@@ -466,6 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeStudyCompletesAdventure = false;
       _isStudying = true;
       _isComplete = false;
+      _isPetFedInCompletion = false;
     });
   }
 
@@ -515,6 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeLevel = null;
       _isStudying = false;
       _isComplete = false;
+      _isPetFedInCompletion = false;
       _selectedParentDetailChildId = null;
       _clearActiveStudyOverride();
       _adventure = _loadPlannedAdventure(
@@ -4207,10 +4221,12 @@ class _AnswerFeedbackPanel extends StatelessWidget {
 class _PetRewardStrip extends StatelessWidget {
   const _PetRewardStrip({
     required this.adventure,
+    required this.isPetFed,
     required this.onFeedPet,
   });
 
   final AdventureDashboardSnapshot adventure;
+  final bool isPetFed;
   final VoidCallback onFeedPet;
 
   @override
@@ -4222,37 +4238,195 @@ class _PetRewardStrip extends StatelessWidget {
         color: const Color(0xFFEAF6F1),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.pets_rounded,
-            color: Color(0xFF2F856F),
-            size: 26,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${adventure.pet.name} 获得成长 +$growthReward，离下一级更近了。',
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        child: isPetFed
+            ? Row(
+                key: const ValueKey('pet-fed-strip'),
+                children: [
+                  const Icon(
+                    Icons.favorite_rounded,
+                    color: Color(0xFF2F856F),
+                    size: 26,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${adventure.pet.name}吃饱啦，成长值 +$growthReward，饱腹 ${adventure.pet.satiety}%',
+                      style: const TextStyle(
+                        color: Color(0xFF2F856F),
+                        fontSize: 15,
+                        height: 1.3,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                key: const ValueKey('pet-ready-strip'),
+                children: [
+                  const Icon(
+                    Icons.pets_rounded,
+                    color: Color(0xFF2F856F),
+                    size: 26,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${adventure.pet.name} 获得成长 +$growthReward，离下一级更近了。',
+                      style: const TextStyle(
+                        color: Color(0xFF2F856F),
+                        fontSize: 15,
+                        height: 1.3,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onFeedPet,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF2F856F),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    child: Text('喂食${adventure.pet.name}'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _FedPetCelebration extends StatelessWidget {
+  const _FedPetCelebration({
+    required this.pet,
+    required this.growthReward,
+    required this.onReturnHome,
+  });
+
+  final PetProfile pet;
+  final int growthReward;
+  final VoidCallback onReturnHome;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.92, end: 1),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: Container(
+        key: const ValueKey('pet-fed-celebration'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF6DF),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFFFC766), width: 2),
+        ),
+        child: Column(
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 108,
+                  height: 108,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFE7AE),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const Positioned(
+                  top: 8,
+                  right: 18,
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Color(0xFFFF9500),
+                    size: 26,
+                  ),
+                ),
+                const Positioned(
+                  bottom: 12,
+                  left: 18,
+                  child: Icon(
+                    Icons.favorite_rounded,
+                    color: Color(0xFFFF6B6B),
+                    size: 24,
+                  ),
+                ),
+                const Icon(
+                  Icons.pets_rounded,
+                  color: Color(0xFF2F856F),
+                  size: 58,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '${pet.name}吃饱啦',
+              style: const TextStyle(
+                color: Color(0xFF111114),
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '成长值 +$growthReward',
               style: const TextStyle(
                 color: Color(0xFF2F856F),
-                fontSize: 15,
-                height: 1.3,
+                fontSize: 17,
                 fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-          TextButton(
-            onPressed: onFeedPet,
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF2F856F),
-              textStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: pet.satiety / 100,
+                minHeight: 12,
+                color: const Color(0xFF2F856F),
+                backgroundColor: Colors.white,
               ),
             ),
-            child: Text('喂食${adventure.pet.name}'),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              '饱腹 ${pet.satiety}%',
+              style: const TextStyle(
+                color: Color(0xFF70727A),
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: onReturnHome,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2F856F),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                child: const Text('回到首页'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -4351,12 +4525,16 @@ int _totalGrowthReward(List<AdventureLevel> levels) {
 class _StudyCompleteScreen extends StatelessWidget {
   const _StudyCompleteScreen({
     required this.adventure,
+    required this.isPetFed,
     required this.onFeedPet,
+    required this.onReturnHome,
     required this.onReview,
   });
 
   final AdventureDashboardSnapshot adventure;
+  final bool isPetFed;
   final VoidCallback onFeedPet;
+  final VoidCallback onReturnHome;
   final VoidCallback onReview;
 
   @override
@@ -4403,8 +4581,17 @@ class _StudyCompleteScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
+              if (isPetFed) ...[
+                _FedPetCelebration(
+                  pet: adventure.pet,
+                  growthReward: _totalGrowthReward(adventure.levels),
+                  onReturnHome: onReturnHome,
+                ),
+                const SizedBox(height: 18),
+              ],
               _PetRewardStrip(
                 adventure: adventure,
+                isPetFed: isPetFed,
                 onFeedPet: onFeedPet,
               ),
             ],
@@ -4464,7 +4651,7 @@ class _StudyCompleteScreen extends StatelessWidget {
         SizedBox(
           height: 58,
           child: FilledButton(
-            onPressed: onFeedPet,
+            onPressed: isPetFed ? onReturnHome : onFeedPet,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2F856F),
               foregroundColor: Colors.white,
@@ -4476,7 +4663,7 @@ class _StudyCompleteScreen extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            child: Text('喂食${adventure.pet.name}'),
+            child: Text(isPetFed ? '回到首页' : '喂食${adventure.pet.name}'),
           ),
         ),
         const SizedBox(height: 14),
