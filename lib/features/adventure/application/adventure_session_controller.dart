@@ -77,6 +77,29 @@ class AdventureSessionController {
     );
   }
 
+  AdventureDashboardSnapshot feedPetWithReward(
+    AdventureDashboardSnapshot snapshot, {
+    required AdventureReward reward,
+    required DateTime fedAt,
+  }) {
+    final fedPet = _growPet(
+      snapshot.pet,
+      growthReward: reward.growthPoints,
+      fedAt: fedAt,
+    );
+
+    return AdventureDashboardSnapshot(
+      childId: snapshot.childId,
+      themeTitle: snapshot.themeTitle,
+      currentNodeTitle: snapshot.currentNodeTitle,
+      starsEarned: snapshot.starsEarned,
+      starsTarget: snapshot.starsTarget,
+      chestProgress: snapshot.chestProgress,
+      levels: snapshot.levels,
+      pet: fedPet,
+    );
+  }
+
   AdventureLevelStatus _nextStatus(
     AdventureDashboardSnapshot snapshot,
     int index,

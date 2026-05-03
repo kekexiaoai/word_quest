@@ -144,9 +144,15 @@ void main() {
     ]);
 
     expect(find.text('今天完成了'), findsOneWidget);
-    expect(find.text('安安获得 3 颗星，森林书屋第 4 站已点亮。'), findsOneWidget);
-    expect(find.text('普通食物 +1'), findsOneWidget);
-    expect(find.text('宠物成长 +24'), findsOneWidget);
+    expect(find.text('安安完成 3 题，点亮复习探索关。'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('获得 1 颗星'), findsOneWidget);
+    expect(find.text('能量饮品 +1'), findsOneWidget);
+    expect(find.text('能量 +8'), findsOneWidget);
+    expect(find.text('安安获得 3 颗星，森林书屋第 4 站已点亮。'), findsNothing);
+    expect(find.text('宠物成长 +24'), findsNothing);
     expect(find.text('喂食豆豆'), findsOneWidget);
   });
 
@@ -186,6 +192,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('今天完成了'), findsOneWidget);
+    expect(find.text('75%'), findsOneWidget);
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('through'), findsWidgets);
+    expect(find.text('听音待复习'), findsOneWidget);
   });
 
   testWidgets('答题会写入学习记录并标记薄弱类型', (tester) async {
@@ -940,13 +950,13 @@ mountain,高山
     await tester.pumpAndSettle();
 
     expect(find.text('豆豆吃饱啦'), findsOneWidget);
-    expect(find.text('成长值 +24'), findsOneWidget);
+    expect(find.text('能量 +8'), findsWidgets);
     expect(find.text('饱腹 88%'), findsOneWidget);
 
     await tester.tap(find.text('回到首页'));
     await tester.pumpAndSettle();
 
-    expect(find.text('豆豆 Lv.3'), findsOneWidget);
+    expect(find.text('豆豆 Lv.2'), findsOneWidget);
     expect(find.text('饱腹 88%'), findsOneWidget);
     expect(find.text('错词 Boss 关'), findsOneWidget);
   });
@@ -980,7 +990,7 @@ mountain,高山
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('豆豆 Lv.3'), findsOneWidget);
+    expect(find.text('豆豆 Lv.2'), findsOneWidget);
     expect(find.text('饱腹 88%'), findsOneWidget);
     expect(find.text('错词 Boss 关'), findsOneWidget);
   });

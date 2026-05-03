@@ -127,6 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isComplete = false;
   bool _isParentMode = false;
   bool _isPetFedInCompletion = false;
+  _StudySessionSummary? _completionSummary;
   String? _selectedParentDetailChildId;
   String? _activeStudyChildId;
   String? _activeStudySelectedWordBookId;
@@ -196,12 +197,22 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: _StudyCompleteScreen(
+                childName: currentChild.name,
                 adventure: _adventure,
+                summary: _completionSummary ??
+                    _StudySessionSummary.empty(
+                      level: _activeLevel ?? _adventure.currentLevel,
+                    ),
                 isPetFed: _isPetFedInCompletion,
                 onFeedPet: () {
                   setState(() {
-                    _adventure = _sessionController.feedPetWithTodayRewards(
+                    final summary = _completionSummary ??
+                        _StudySessionSummary.empty(
+                          level: _activeLevel ?? _adventure.currentLevel,
+                        );
+                    _adventure = _sessionController.feedPetWithReward(
                       _adventure,
+                      reward: summary.reward,
                       fedAt: DateTime.now(),
                     );
                     _adventureRepository.saveAdventure(_adventure);
@@ -213,6 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _isStudying = false;
                     _isComplete = false;
                     _isPetFedInCompletion = false;
+                    _completionSummary = null;
                     _selectedTab = _HomeTab.today;
                   });
                 },
@@ -220,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _isComplete = false;
                     _isPetFedInCompletion = false;
+                    _completionSummary = null;
                     _selectedTab = _HomeTab.wordBook;
                   });
                 },
@@ -252,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _clearActiveStudyOverride();
                   });
                 },
-                onComplete: () {
+                onComplete: (summary) {
                   setState(() {
                     if (_activeStudyCompletesAdventure) {
                       _adventure = _planAdventureSnapshot(
@@ -262,6 +275,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                     _isStudying = false;
                     _isComplete = _activeStudyCompletesAdventure;
+                    _completionSummary =
+                        _activeStudyCompletesAdventure ? summary : null;
                     _isPetFedInCompletion = false;
                     _clearActiveStudyOverride();
                   });
@@ -324,6 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _activeStudySelectedWordBookId = null;
                   _activeStudyCompletesAdventure = true;
                   _isPetFedInCompletion = false;
+                  _completionSummary = null;
                 });
               },
             ),
@@ -338,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _activeStudySelectedWordBookId = null;
               _activeStudyCompletesAdventure = true;
               _isPetFedInCompletion = false;
+              _completionSummary = null;
             });
           },
         ),
@@ -479,6 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isStudying = true;
       _isComplete = false;
       _isPetFedInCompletion = false;
+      _completionSummary = null;
     });
   }
 
@@ -529,6 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isStudying = false;
       _isComplete = false;
       _isPetFedInCompletion = false;
+      _completionSummary = null;
       _selectedParentDetailChildId = null;
       _clearActiveStudyOverride();
       _adventure = _loadPlannedAdventure(
@@ -3772,7 +3791,7 @@ class _StudyQuizScreen extends StatefulWidget {
   final String? selectedWordBookId;
   final PronunciationPlayer pronunciationPlayer;
   final VoidCallback onClose;
-  final VoidCallback onComplete;
+  final ValueChanged<_StudySessionSummary> onComplete;
 
   @override
   State<_StudyQuizScreen> createState() => _StudyQuizScreenState();
@@ -3784,6 +3803,7 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
 
   late final List<AnswerRecord> _answerRecordsSnapshot;
   late final List<WordLearningProgress> _learningProgressSnapshot;
+  final List<_StudySessionAnswer> _sessionAnswers = [];
   late final List<int> _questionQueue = List<int>.generate(
     widget.level.questionCount <= 0 ? 1 : widget.level.questionCount,
     (index) => index,
@@ -3942,6 +3962,12 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                     elapsedMilliseconds <= 0 ? 1 : elapsedMilliseconds,
               );
               widget.answerRecordRepository.addRecord(record);
+              _sessionAnswers.add(
+                _StudySessionAnswer(
+                  record: record,
+                  wordLabel: quiz.prompt,
+                ),
+              );
               final previousProgress =
                   widget.wordLearningProgressRepository.loadProgress(
                 childId: widget.childId,
@@ -3990,7 +4016,12 @@ class _StudyQuizScreenState extends State<_StudyQuizScreen> {
                     final shouldComplete =
                         isAnswerCorrect && isLastQueuedQuestion;
                     if (shouldComplete) {
-                      widget.onComplete();
+                      widget.onComplete(
+                        _StudySessionSummary.fromAnswers(
+                          level: widget.level,
+                          answers: _sessionAnswers,
+                        ),
+                      );
                       return;
                     }
 
@@ -4221,17 +4252,18 @@ class _AnswerFeedbackPanel extends StatelessWidget {
 class _PetRewardStrip extends StatelessWidget {
   const _PetRewardStrip({
     required this.adventure,
+    required this.summary,
     required this.isPetFed,
     required this.onFeedPet,
   });
 
   final AdventureDashboardSnapshot adventure;
+  final _StudySessionSummary summary;
   final bool isPetFed;
   final VoidCallback onFeedPet;
 
   @override
   Widget build(BuildContext context) {
-    final growthReward = _totalGrowthReward(adventure.levels);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -4252,7 +4284,7 @@ class _PetRewardStrip extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${adventure.pet.name}吃饱啦，成长值 +$growthReward，饱腹 ${adventure.pet.satiety}%',
+                      '${adventure.pet.name}吃饱啦，${summary.petRewardLabel}，饱腹 ${adventure.pet.satiety}%',
                       style: const TextStyle(
                         color: Color(0xFF2F856F),
                         fontSize: 15,
@@ -4274,7 +4306,7 @@ class _PetRewardStrip extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${adventure.pet.name} 获得成长 +$growthReward，离下一级更近了。',
+                      '${adventure.pet.name}获得${summary.petRewardLabel}，喂食后饱腹会提升。',
                       style: const TextStyle(
                         color: Color(0xFF2F856F),
                         fontSize: 15,
@@ -4304,12 +4336,12 @@ class _PetRewardStrip extends StatelessWidget {
 class _FedPetCelebration extends StatelessWidget {
   const _FedPetCelebration({
     required this.pet,
-    required this.growthReward,
+    required this.petRewardLabel,
     required this.onReturnHome,
   });
 
   final PetProfile pet;
-  final int growthReward;
+  final String petRewardLabel;
   final VoidCallback onReturnHome;
 
   @override
@@ -4379,7 +4411,7 @@ class _FedPetCelebration extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '成长值 +$growthReward',
+              petRewardLabel,
               style: const TextStyle(
                 color: Color(0xFF2F856F),
                 fontSize: 17,
@@ -4433,23 +4465,18 @@ class _FedPetCelebration extends StatelessWidget {
 }
 
 class _RewardSummaryGrid extends StatelessWidget {
-  const _RewardSummaryGrid({required this.adventure});
+  const _RewardSummaryGrid({required this.summary});
 
-  final AdventureDashboardSnapshot adventure;
+  final _StudySessionSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    final firstFood = adventure.levels
-        .map((level) => level.reward)
-        .firstWhere((reward) => reward.foodName != null);
-    final growthReward = _totalGrowthReward(adventure.levels);
-
     return Row(
       children: [
         Expanded(
           child: _RewardChip(
             icon: Icons.star_rounded,
-            label: '获得 ${adventure.starsTarget} 颗星',
+            label: '获得 ${summary.reward.stars} 颗星',
             color: const Color(0xFFFF9500),
           ),
         ),
@@ -4457,7 +4484,7 @@ class _RewardSummaryGrid extends StatelessWidget {
         Expanded(
           child: _RewardChip(
             icon: Icons.restaurant_rounded,
-            label: '${firstFood.foodName} +${firstFood.foodCount}',
+            label: summary.rewardItemLabel,
             color: const Color(0xFF2F856F),
           ),
         ),
@@ -4465,7 +4492,7 @@ class _RewardSummaryGrid extends StatelessWidget {
         Expanded(
           child: _RewardChip(
             icon: Icons.pets_rounded,
-            label: '宠物成长 +$growthReward',
+            label: summary.petRewardLabel,
             color: const Color(0xFF5856D6),
           ),
         ),
@@ -4515,23 +4542,56 @@ class _RewardChip extends StatelessWidget {
   }
 }
 
-int _totalGrowthReward(List<AdventureLevel> levels) {
-  return levels.fold(
-    0,
-    (total, level) => total + level.reward.growthPoints,
-  );
+class _CompletionReviewList extends StatelessWidget {
+  const _CompletionReviewList({required this.reviewItems});
+
+  final List<_StudyReviewItem> reviewItems;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reviewItems.isEmpty) {
+      return const _GroupedList(
+        children: [
+          _RouteRow(
+            icon: Icons.check_circle_rounded,
+            iconColor: Color(0xFF2F856F),
+            iconBackground: Color(0xFFEAF6F1),
+            title: '今天没有新增错词',
+            subtitle: '明天会按间隔复习继续巩固',
+          ),
+        ],
+      );
+    }
+
+    return _GroupedList(
+      children: [
+        for (final item in reviewItems)
+          _RouteRow(
+            icon: item.icon,
+            iconColor: const Color(0xFFFF9500),
+            iconBackground: const Color(0xFFFFF2D9),
+            title: item.wordLabel,
+            subtitle: item.subtitle,
+          ),
+      ],
+    );
+  }
 }
 
 class _StudyCompleteScreen extends StatelessWidget {
   const _StudyCompleteScreen({
+    required this.childName,
     required this.adventure,
+    required this.summary,
     required this.isPetFed,
     required this.onFeedPet,
     required this.onReturnHome,
     required this.onReview,
   });
 
+  final String childName;
   final AdventureDashboardSnapshot adventure;
+  final _StudySessionSummary summary;
   final bool isPetFed;
   final VoidCallback onFeedPet;
   final VoidCallback onReturnHome;
@@ -4570,10 +4630,10 @@ class _StudyCompleteScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 22),
-              const Text(
-                '安安获得 3 颗星，森林书屋第 4 站已点亮。',
+              Text(
+                '$childName完成 ${summary.completedQuestionCount} 题，点亮${summary.levelTitle}。',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFF70727A),
                   fontSize: 18,
                   height: 1.35,
@@ -4584,13 +4644,14 @@ class _StudyCompleteScreen extends StatelessWidget {
               if (isPetFed) ...[
                 _FedPetCelebration(
                   pet: adventure.pet,
-                  growthReward: _totalGrowthReward(adventure.levels),
+                  petRewardLabel: summary.petRewardLabel,
                   onReturnHome: onReturnHome,
                 ),
                 const SizedBox(height: 18),
               ],
               _PetRewardStrip(
                 adventure: adventure,
+                summary: summary,
                 isPetFed: isPetFed,
                 onFeedPet: onFeedPet,
               ),
@@ -4598,25 +4659,25 @@ class _StudyCompleteScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 26),
-        const Row(
+        Row(
           children: [
             Expanded(
               child: _MetricTile(
-                value: '18',
+                value: '${summary.completedQuestionCount}',
                 label: '完成',
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: _MetricTile(
-                value: '94%',
+                value: summary.accuracyLabel,
                 label: '正确率',
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: _MetricTile(
-                value: '2',
+                value: '${summary.pendingReviewCount}',
                 label: '待复习',
               ),
             ),
@@ -4625,28 +4686,11 @@ class _StudyCompleteScreen extends StatelessWidget {
         const SizedBox(height: 28),
         const _SectionTitle('今日奖励'),
         const SizedBox(height: 14),
-        _RewardSummaryGrid(adventure: adventure),
+        _RewardSummaryGrid(summary: summary),
         const SizedBox(height: 28),
         const _SectionTitle('明天优先复习'),
         const SizedBox(height: 14),
-        const _GroupedList(
-          children: [
-            _RouteRow(
-              icon: Icons.edit_outlined,
-              iconColor: Color(0xFFFF9500),
-              iconBackground: Color(0xFFFFF2D9),
-              title: 'through',
-              subtitle: '拼写仍不稳定',
-            ),
-            _RouteRow(
-              icon: Icons.volume_up_rounded,
-              iconColor: Color(0xFF5856D6),
-              iconBackground: Color(0xFFECEBFF),
-              title: 'neighbor',
-              subtitle: '听音反应稍慢',
-            ),
-          ],
-        ),
+        _CompletionReviewList(reviewItems: summary.reviewItems),
         const SizedBox(height: 120),
         SizedBox(
           height: 58,
@@ -4714,6 +4758,141 @@ class _CircleButton extends StatelessWidget {
         child: Icon(icon, color: const Color(0xFF70727A), size: 30),
       ),
     );
+  }
+}
+
+class _StudySessionAnswer {
+  const _StudySessionAnswer({
+    required this.record,
+    required this.wordLabel,
+  });
+
+  final AnswerRecord record;
+  final String wordLabel;
+}
+
+class _StudyReviewItem {
+  const _StudyReviewItem({
+    required this.wordLabel,
+    required this.weaknessType,
+  });
+
+  final String wordLabel;
+  final AnswerWeaknessType? weaknessType;
+
+  String get subtitle {
+    return switch (weaknessType) {
+      AnswerWeaknessType.meaning => '释义待复习',
+      AnswerWeaknessType.spelling => '拼写待复习',
+      AnswerWeaknessType.listening => '听音待复习',
+      null => '稍后再巩固',
+    };
+  }
+
+  IconData get icon {
+    return switch (weaknessType) {
+      AnswerWeaknessType.meaning => Icons.translate_rounded,
+      AnswerWeaknessType.spelling => Icons.edit_outlined,
+      AnswerWeaknessType.listening => Icons.volume_up_rounded,
+      null => Icons.refresh_rounded,
+    };
+  }
+}
+
+class _StudySessionSummary {
+  const _StudySessionSummary({
+    required this.levelTitle,
+    required this.reward,
+    required this.completedQuestionCount,
+    required this.attemptCount,
+    required this.correctCount,
+    required this.reviewItems,
+  });
+
+  factory _StudySessionSummary.empty({required AdventureLevel level}) {
+    return _StudySessionSummary(
+      levelTitle: level.title,
+      reward: level.reward,
+      completedQuestionCount: 0,
+      attemptCount: 0,
+      correctCount: 0,
+      reviewItems: const [],
+    );
+  }
+
+  factory _StudySessionSummary.fromAnswers({
+    required AdventureLevel level,
+    required List<_StudySessionAnswer> answers,
+  }) {
+    final reviewItems = <_StudyReviewItem>[];
+    final seenReviewWords = <String>{};
+    for (final answer in answers) {
+      if (answer.record.isCorrect ||
+          seenReviewWords.contains(answer.wordLabel)) {
+        continue;
+      }
+      seenReviewWords.add(answer.wordLabel);
+      reviewItems.add(
+        _StudyReviewItem(
+          wordLabel: answer.wordLabel,
+          weaknessType: answer.record.weaknessType,
+        ),
+      );
+    }
+
+    return _StudySessionSummary(
+      levelTitle: level.title,
+      reward: level.reward,
+      completedQuestionCount:
+          answers.where((answer) => answer.record.isCorrect).length,
+      attemptCount: answers.length,
+      correctCount: answers.where((answer) => answer.record.isCorrect).length,
+      reviewItems: reviewItems,
+    );
+  }
+
+  final String levelTitle;
+  final AdventureReward reward;
+  final int completedQuestionCount;
+  final int attemptCount;
+  final int correctCount;
+  final List<_StudyReviewItem> reviewItems;
+
+  int get accuracyPercent {
+    if (attemptCount == 0) {
+      return 0;
+    }
+    return (correctCount / attemptCount * 100).round();
+  }
+
+  int get pendingReviewCount => reviewItems.length;
+
+  String get accuracyLabel => '$accuracyPercent%';
+
+  String get rewardItemLabel {
+    if (reward.foodName != null && reward.foodCount > 0) {
+      return '${reward.foodName} +${reward.foodCount}';
+    }
+    if (reward.energy > 0) {
+      return '能量 +${reward.energy}';
+    }
+    if (reward.chestProgress > 0) {
+      return '宝箱 +${reward.chestProgress}%';
+    }
+    return '奖励已领取';
+  }
+
+  String get petRewardLabel {
+    if (reward.growthPoints > 0) {
+      return '成长值 +${reward.growthPoints}';
+    }
+    if (reward.energy > 0) {
+      return '能量 +${reward.energy}';
+    }
+    if (reward.foodName != null && reward.foodCount > 0) {
+      return '${reward.foodName} +${reward.foodCount}';
+    }
+    return '陪伴奖励已记录';
   }
 }
 
