@@ -364,16 +364,50 @@ class _HomeScreenState extends State<HomeScreen> {
       childId: child.id,
       wordBookId: profile.wordBook.id,
     );
+    final adventure = _loadPlannedAdventure(
+      childId: child.id,
+      referenceDate: createdAt,
+    );
+    final adoptedAdventure = _adoptPet(
+      adventure: adventure,
+      petName: profile.petName,
+    );
+    _adventureRepository.saveAdventure(adoptedAdventure);
 
     setState(() {
       _dashboard = _loadDashboard(createdAt);
       _selectedChildId = child.id;
-      _adventure = _loadPlannedAdventure(
-        childId: child.id,
-        referenceDate: createdAt,
-      );
+      _adventure = adoptedAdventure;
       _selectedTab = _HomeTab.today;
     });
+  }
+
+  AdventureDashboardSnapshot _adoptPet({
+    required AdventureDashboardSnapshot adventure,
+    required String petName,
+  }) {
+    return AdventureDashboardSnapshot(
+      childId: adventure.childId,
+      themeTitle: adventure.themeTitle,
+      currentNodeTitle: adventure.currentNodeTitle,
+      starsEarned: adventure.starsEarned,
+      starsTarget: adventure.starsTarget,
+      chestProgress: adventure.chestProgress,
+      levels: adventure.levels,
+      pet: PetProfile(
+        childId: adventure.pet.childId,
+        petId: adventure.pet.petId,
+        name: petName,
+        level: adventure.pet.level,
+        growthPoints: adventure.pet.growthPoints,
+        growthTarget: adventure.pet.growthTarget,
+        satiety: adventure.pet.satiety,
+        mood: adventure.pet.mood,
+        equippedDecorationIds: adventure.pet.equippedDecorationIds,
+        unlockedDecorationIds: adventure.pet.unlockedDecorationIds,
+        lastFedAt: adventure.pet.lastFedAt,
+      ),
+    );
   }
 
   Widget _buildParentTodayTab() {
@@ -1102,10 +1136,12 @@ class _LearnerPill extends StatelessWidget {
 class _OnboardingProfile {
   const _OnboardingProfile({
     required this.childName,
+    required this.petName,
     required this.wordBook,
   });
 
   final String childName;
+  final String petName;
   final WordBook wordBook;
 }
 
@@ -1124,6 +1160,7 @@ class _OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<_OnboardingScreen> {
   late final TextEditingController _nameController;
+  late final TextEditingController _petNameController;
   String? _selectedWordBookId;
   String? _errorText;
 
@@ -1131,6 +1168,7 @@ class _OnboardingScreenState extends State<_OnboardingScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _petNameController = TextEditingController(text: '豆豆');
     _selectedWordBookId =
         widget.wordBooks.isEmpty ? null : widget.wordBooks.first.id;
   }
@@ -1138,6 +1176,7 @@ class _OnboardingScreenState extends State<_OnboardingScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _petNameController.dispose();
     super.dispose();
   }
 
@@ -1190,6 +1229,49 @@ class _OnboardingScreenState extends State<_OnboardingScreen> {
                     });
                   }
                 },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '领养学习伙伴',
+                style: TextStyle(
+                  color: Color(0xFF111114),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '默认：豆豆',
+                style: TextStyle(
+                  color: Color(0xFF70727A),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                key: const ValueKey('onboarding_pet_name_input'),
+                controller: _petNameController,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: '宠物名字',
+                  hintText: '不填则使用豆豆',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
               ),
             ],
           ),
@@ -1260,9 +1342,15 @@ class _OnboardingScreenState extends State<_OnboardingScreen> {
     widget.onComplete(
       _OnboardingProfile(
         childName: childName,
+        petName: _normalizedPetName,
         wordBook: wordBook,
       ),
     );
+  }
+
+  String get _normalizedPetName {
+    final petName = _petNameController.text.trim();
+    return petName.isEmpty ? '豆豆' : petName;
   }
 }
 

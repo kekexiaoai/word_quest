@@ -23,6 +23,7 @@ void main() {
     final childProfileRepository = InMemoryChildProfileRepository(
       storage: childStorage,
     );
+    final adventureStorage = <String, AdventureDashboardSnapshot>{};
     final selectionRepository = InMemoryLearningWordBookSelectionRepository();
 
     await tester.pumpWidget(MaterialApp(
@@ -30,7 +31,9 @@ void main() {
         childProfileRepository: childProfileRepository,
         learningWordBookSelectionRepository: selectionRepository,
         wordBookRepository: const InMemoryWordBookRepository(),
-        adventureRepository: const InMemoryAdventureRepository(storage: {}),
+        adventureRepository: InMemoryAdventureRepository(
+          storage: adventureStorage,
+        ),
         answerRecordRepository:
             const InMemoryAnswerRecordRepository(storage: []),
         wordLearningProgressRepository:
@@ -42,16 +45,32 @@ void main() {
     expect(find.text('欢迎来到词途'), findsOneWidget);
     expect(find.text('先设置学习资料'), findsOneWidget);
     expect(find.text('小学高年级基础词表'), findsOneWidget);
-    expect(find.text('初中核心词表'), findsOneWidget);
+    expect(find.text('领养学习伙伴'), findsOneWidget);
+    expect(find.text('默认：豆豆'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('onboarding_child_name_input')),
       '小明',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('onboarding_pet_name_input')),
+      '闪闪',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('onboarding_word_book_middle-core')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('初中核心词表'), findsOneWidget);
     await tester
         .tap(find.byKey(const ValueKey('onboarding_word_book_middle-core')));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('onboarding_start_button')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding_start_button')));
     await tester.pumpAndSettle();
@@ -66,6 +85,7 @@ void main() {
     );
     expect(find.text('欢迎来到词途'), findsNothing);
     expect(find.text('小明'), findsOneWidget);
+    expect(find.text('闪闪 Lv.2'), findsOneWidget);
     expect(find.text('继续学习'), findsOneWidget);
   });
 
